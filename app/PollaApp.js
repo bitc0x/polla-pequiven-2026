@@ -9,7 +9,7 @@ import {
   KO_ROUNDS, SPECIAL_AWARDS, SCORING, TOURNAMENT_START,
   BUY_IN_USD, VENMO_HANDLE, PRIZE_SPLIT, PRIZE_LABELS,
 } from '@/lib/worldcup-data';
-import { scorePlayer, scoreMatchPrediction, computeGroupStandings, computeR32Candidates } from '@/lib/scoring';
+import { scorePlayer, scoreMatchPrediction, computeGroupStandings, buildBracket } from '@/lib/scoring';
 import Avatar from '@/components/Avatar';
 import ThemeToggle from '@/components/ThemeToggle';
 import MusicToggle from '@/components/MusicToggle';
@@ -404,34 +404,38 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults,
 
 // ============ KNOCKOUT BRACKET VISUAL ============
 function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults }) {
-  // CASCADE: candidates per round are derived from the previous round's picks.
-  // R32 candidates come from the user's own group stage predictions: top 2 of
-  // each group + best 8 third places (32 teams total per FIFA 2026 format).
-  // If the user hasn't filled all group matches yet, candidates may be < 32.
-  const r32Candidates = useMemo(() => computeR32Candidates(predictions), [predictions]);
-  const standings = useMemo(() => computeGroupStandings(predictions), [predictions]);
+  // Build the bracket: resolve R32 matchups from group standings, then R16
+  // matchups from R32 winner picks, and so on through Final.
+  const bracket = useMemo(() => buildBracket(predictions), [predictions]);
+  const realBracket = useMemo(() => buildBracket(results), [results]);
+  const standings = bracket.standings;
 
-  function candidatesFor(roundKey) {
-    if (roundKey === 'r32') return r32Candidates;
-    const prev = { r16: 'r32', qf: 'r16', sf: 'qf', final: 'sf' }[roundKey];
-    return (predictions?.knockouts?.[prev] || []).filter(Boolean);
-  }
-
-  function getSlot(roundKey, i) {
-    return predictions?.knockouts?.[roundKey]?.[i] || '';
-  }
-
-  function setSlot(roundKey, i, value) {
+  function setMatchWinner(roundKey, matchIdx, teamCode) {
     if (locked) return;
     const current = [...(predictions?.knockouts?.[roundKey] || [])];
-    while (current.length < i + 1) current.push(null);
-    current[i] = value || null;
+    while (current.length < matchIdx + 1) current.push(null);
+    // Toggle off if clicking the same selection again
+    current[matchIdx] = (current[matchIdx] === teamCode) ? null : (teamCode || null);
     onUpdateKO(roundKey, current);
+    // If this round changed, downstream picks may now be inconsistent. Clear
+    // any downstream picks that no longer have a valid team (e.g. user
+    // changed R32 winner so R16 has a feeder change). We don't auto-clear;
+    // instead, the stale picks will be visually flagged in the next render.
   }
 
-  // Detect if group stage is incomplete enough to make R32 unreliable
   const groupMatchesFilled = Object.values(predictions?.groupMatches || {}).filter(m => m && m.home != null && m.away != null).length;
   const groupStageIncomplete = groupMatchesFilled < 72;
+  const allGroupsComplete = groupMatchesFilled === 72;
+
+  // Count winners per round and whether previous round is fully picked
+  function roundReady(roundKey) {
+    if (roundKey === 'r32') return allGroupsComplete;
+    const prev = { r16: 'r32', qf: 'r16', sf: 'qf', final: 'sf' }[roundKey];
+    const prevPicks = predictions?.knockouts?.[prev] || [];
+    const prevMatches = bracket[prev];
+    if (!prevMatches) return false;
+    return prevMatches.every((_, i) => !!prevPicks[i]);
+  }
 
   return (
     <div>
@@ -439,21 +443,20 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
       <p className="section-sub">
         {locked
           ? 'Llaves cerradas. Solo lectura.'
-          : 'Predice qué selecciones avanzan a cada ronda. Cada ronda muestra solo los equipos que tu pasaste de la ronda anterior, basado en tu fase de grupos.'}
+          : 'Bracket determinístico FIFA 2026. R32 se llena automáticamente con tus predicciones de grupos. En cada partido, click en el equipo que crees gana.'}
       </p>
 
       {!locked && groupStageIncomplete && (
         <div className="warn-msg mb-6">
-          <strong>Tip:</strong> Tu fase de grupos está al {Math.round((groupMatchesFilled / 72) * 100)}%. Llaves usa tus predicciones de grupos para mostrarte los 32 equipos candidatos en R32. Llena fase de grupos primero para una experiencia más intuitiva.
+          <strong>Falta tu fase de grupos:</strong> R32 muestra los cruces oficiales del Mundial 2026 (Match 73: 2A vs 2B, Match 75: 1F vs 2C, etc.) pero los equipos solo aparecen cuando tengas tu fase de grupos al 100%. Llevas {groupMatchesFilled}/72.
         </div>
       )}
 
-      {/* Predicted standings preview */}
-      {!locked && groupMatchesFilled > 0 && (
+      {!locked && allGroupsComplete && (
         <details className="standings-preview">
           <summary>
             <span>Ver mis standings predichas de fase de grupos</span>
-            <span className="hairline">{groupMatchesFilled}/72 partidos predichos</span>
+            <span className="hairline">Top 2 + mejores 8 terceros = 32 equipos en R32</span>
           </summary>
           <div className="standings-grid">
             {Object.entries(standings).map(([groupId, ranked]) => (
@@ -470,9 +473,6 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted mt-3" style={{ paddingLeft: 12 }}>
-            Top 2 de cada grupo (24) + mejores 8 terceros de los 12 grupos = 32 equipos en R32. Estos son los candidatos que aparecen en el dropdown de R32.
-          </p>
         </details>
       )}
 
@@ -480,84 +480,65 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
         {KO_ROUNDS.map((r) => (
           <span key={r.key} className="bracket-legend-item">
             <strong>{r.label}</strong>
-            <span className="dim">{r.pointsTeam}pts c/u</span>
+            <span className="dim">{r.pointsPerMatch}pts</span>
           </span>
         ))}
       </div>
 
       <div className="bracket-wrap">
-        <div className="bracket-tree">
+        <div className="bracket-tree-v2">
           {KO_ROUNDS.map((round) => {
-            const realSet = new Set(results?.knockouts?.[round.key] || []);
+            const matches = bracket[round.key] || [];
+            const realMatches = realBracket[round.key] || [];
             const picks = predictions?.knockouts?.[round.key] || [];
             const filledCount = picks.filter(Boolean).length;
-            const candidates = candidatesFor(round.key);
-            const useGrid = round.count >= 16;
-            const noCandidates = !locked && candidates.length === 0;
+            const ready = roundReady(round.key);
 
             return (
-              <div key={round.key} className={`bracket-col col-${round.key}`}>
-                <div className="bracket-col-head">
-                  <div className="bracket-col-title">{round.label}</div>
-                  <div className="bracket-col-meta">
+              <div key={round.key} className={`bracket-round col-${round.key}`}>
+                <div className="bracket-round-head">
+                  <div className="bracket-round-title">{round.label}</div>
+                  <div className="bracket-round-meta">
                     <span className="mono">{filledCount}/{round.count}</span>
-                    <span className="bracket-col-dates">{round.dates}</span>
+                    <span className="bracket-round-dates">{round.dates}</span>
                   </div>
                 </div>
 
-                {noCandidates ? (
+                {!ready && !locked ? (
                   <div className="bracket-empty-state">
                     {round.key === 'r32'
-                      ? 'Llena tu fase de grupos para ver los 32 candidatos.'
-                      : `Llena la ronda anterior para desbloquear ${round.label}.`}
+                      ? 'Llena los 72 partidos de fase de grupos.'
+                      : `Pica todos los ganadores de ${KO_ROUNDS.find(r => r.key === ({r16: 'r32', qf: 'r16', sf: 'qf', final: 'sf'}[round.key]))?.label}.`}
                   </div>
                 ) : (
-                  <div className={`bracket-slots ${useGrid ? 'two-col' : 'one-col'}`}>
-                    {Array.from({ length: round.count }).map((_, i) => {
-                      const val = getSlot(round.key, i);
-                      let cls = 'bracket-slot';
-                      if (!val) cls += ' empty';
-                      if (showResults && val) {
-                        cls += realSet.has(val) ? ' correct' : ' incorrect';
-                      }
-                      // If the current value is not in candidates (e.g., user
-                      // changed group preds and this team no longer qualifies),
-                      // flag it so the user knows
-                      const isStale = !locked && val && !candidates.includes(val);
-
-                      if (locked) {
-                        return (
-                          <div key={i} className={cls}>
-                            {val ? (
-                              <>
-                                <span className="flag">{TEAMS[val]?.flag}</span>
-                                <span className="nm">{TEAMS[val]?.short || TEAMS[val]?.name}</span>
-                              </>
-                            ) : (
-                              <span className="nm dim">—</span>
-                            )}
-                          </div>
-                        );
-                      }
-                      // Build option list: candidates only, with current value
-                      // included even if stale (so it's selectable to be removed)
-                      const optionList = [...candidates];
-                      if (val && !candidates.includes(val)) optionList.unshift(val);
-
+                  <div className="bracket-matches">
+                    {matches.map((m, idx) => {
+                      const [teamA, teamB] = m.teams;
+                      const [labelA, labelB] = m.teamsLabel;
+                      const winner = m.winner;
+                      const realWinner = realMatches[idx]?.winner;
+                      const showCorrect = showResults && winner && realWinner;
+                      const correct = showCorrect && winner === realWinner;
                       return (
-                        <select
-                          key={i}
-                          className={`${cls} ${isStale ? 'stale' : ''}`}
-                          value={val}
-                          onChange={(e) => setSlot(round.key, i, e.target.value)}
-                          aria-label={`${round.label} slot ${i + 1}`}
-                          title={isStale ? 'Este equipo ya no califica según tus picks actuales. Reemplázalo o cambia tus predicciones de grupo.' : undefined}
-                        >
-                          <option value="">—</option>
-                          {optionList.map((t) => (
-                            <option key={t} value={t}>{TEAMS[t].flag} {TEAMS[t].name}</option>
-                          ))}
-                        </select>
+                        <div key={m.id} className={`bracket-match ${showCorrect ? (correct ? 'correct' : 'incorrect') : ''}`}>
+                          <TeamPick
+                            team={teamA}
+                            label={labelA}
+                            selected={winner === teamA && teamA != null}
+                            isReal={showResults && realWinner === teamA}
+                            locked={locked || !teamA}
+                            onClick={() => teamA && setMatchWinner(round.key, idx, teamA)}
+                          />
+                          <div className="bracket-vs">vs</div>
+                          <TeamPick
+                            team={teamB}
+                            label={labelB}
+                            selected={winner === teamB && teamB != null}
+                            isReal={showResults && realWinner === teamB}
+                            locked={locked || !teamB}
+                            onClick={() => teamB && setMatchWinner(round.key, idx, teamB)}
+                          />
+                        </div>
                       );
                     })}
                   </div>
@@ -568,6 +549,33 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
         </div>
       </div>
     </div>
+  );
+}
+
+function TeamPick({ team, label, selected, isReal, locked, onClick }) {
+  const Tag = locked ? 'div' : 'button';
+  let cls = 'team-pick';
+  if (selected) cls += ' selected';
+  if (isReal) cls += ' real';
+  if (!team) cls += ' unresolved';
+  return (
+    <Tag
+      type={locked ? undefined : 'button'}
+      className={cls}
+      onClick={locked ? undefined : onClick}
+      disabled={locked && Tag === 'button'}
+      aria-pressed={selected}
+    >
+      {team ? (
+        <>
+          <span className="team-pick-flag">{TEAMS[team]?.flag}</span>
+          <span className="team-pick-name">{TEAMS[team]?.short || TEAMS[team]?.name}</span>
+          {selected && <span className="team-pick-check">✓</span>}
+        </>
+      ) : (
+        <span className="team-pick-placeholder">{label}</span>
+      )}
+    </Tag>
   );
 }
 
@@ -817,8 +825,7 @@ function MyPicksScreen({ playerId, predictions, results, locked, currentName, pl
   const isSubmitted = !!submittedAt;
   const venmoUrl = `https://venmo.com/${VENMO_HANDLE}?txn=pay&amount=${BUY_IN_USD}&note=Polla%20Pequiven%20Mundial%202026%20-%20${encodeURIComponent(currentName)}`;
 
-  // Completion metrics for the submit gate
-  const totalKOSlots = ['r32','r16','qf','sf','final'].reduce((acc, k) => acc + (KO_ROUNDS.find(r => r.key === k)?.count || 0), 0);
+  const totalKOSlots = KO_ROUNDS.reduce((acc, r) => acc + r.count, 0); // 16+8+4+2+1 = 31
   const totalGroupMatches = 72;
   const totalSpecialAwards = SPECIAL_AWARDS.length;
   const allFilled = filled === totalGroupMatches && totalKO === totalKOSlots && totalSp === totalSpecialAwards;
@@ -989,8 +996,9 @@ function PublicPicksScreen({ players, predictions, results, focusPlayerId, onCle
         const preds = predictions?.[p.id] || {};
         const groupFilled = Object.values(preds?.groupMatches || {}).filter(m => m && m.home != null && m.away != null);
         const champ = preds?.specials?.champion;
-        const r32List = (preds?.knockouts?.r32 || []).filter(Boolean);
-        const finalList = (preds?.knockouts?.final || []).filter(Boolean);
+        const r32Winners = (preds?.knockouts?.r32 || []).filter(Boolean);
+        const finalWinners = (preds?.knockouts?.final || []).filter(Boolean);
+        const sfWinners = (preds?.knockouts?.sf || []).filter(Boolean);
 
         return (
           <div key={p.id} className="player-picks-card">
@@ -1010,18 +1018,18 @@ function PublicPicksScreen({ players, predictions, results, focusPlayerId, onCle
               {champ ? `${TEAMS[champ]?.flag || ''} ${TEAMS[champ]?.name || champ}` : 'Sin predicción'}
             </div>
 
-            <div className="picks-subhead">FINAL (2 equipos)</div>
+            <div className="picks-subhead">FINALISTAS ({sfWinners.length}/2)</div>
             <div className="text-sm">
-              {finalList.length > 0
-                ? finalList.map(t => `${TEAMS[t]?.flag || ''} ${TEAMS[t]?.name || t}`).join(' · ')
+              {sfWinners.length > 0
+                ? sfWinners.map(t => `${TEAMS[t]?.flag || ''} ${TEAMS[t]?.name || t}`).join(' · ')
                 : 'Sin predicción'}
             </div>
 
-            <div className="picks-subhead">PASAN A R32 ({r32List.length}/32)</div>
+            <div className="picks-subhead">PASAN A R16 ({r32Winners.length}/16)</div>
             <div className="text-sm" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {r32List.length > 0
-                ? r32List.map(t => (
-                    <span key={t} style={{ padding: '4px 8px', background: 'var(--bg-card)', borderRadius: 4 }}>
+              {r32Winners.length > 0
+                ? r32Winners.map((t, i) => (
+                    <span key={`${t}-${i}`} style={{ padding: '4px 8px', background: 'var(--bg-card)', borderRadius: 4 }}>
                       {TEAMS[t]?.flag} {TEAMS[t]?.short}
                     </span>
                   ))
@@ -1056,13 +1064,15 @@ function AdminScreen({
     onSetResult(matchId, { ...current, [field]: clean });
   }
 
-  function toggleTeamInRound(roundKey, team, count) {
+  function setMatchWinnerAdmin(roundKey, matchIdx, teamCode) {
     const current = [...(results?.knockouts?.[roundKey] || [])];
-    const idx = current.indexOf(team);
-    if (idx >= 0) current.splice(idx, 1);
-    else if (current.length < count) current.push(team);
-    onSetKOResult(roundKey, current.filter(Boolean));
+    while (current.length < matchIdx + 1) current.push(null);
+    current[matchIdx] = (current[matchIdx] === teamCode) ? null : (teamCode || null);
+    onSetKOResult(roundKey, current);
   }
+
+  // Build real bracket from actual results so admin sees matchups properly
+  const realBracket = useMemo(() => buildBracket(results), [results]);
 
   async function doSync() {
     setSyncing(true);
@@ -1281,39 +1291,72 @@ function AdminScreen({
       </div>
 
       <h2 className="section-title" style={{ fontSize: 22, marginTop: 48 }}>Resultados — Llaves</h2>
-      <p className="section-sub">Click para añadir/quitar equipos que avanzaron a cada ronda.</p>
+      <p className="section-sub">Click en el ganador de cada partido. R32 muestra los cruces oficiales FIFA 2026 (basado en tus resultados de grupos). R16+ se derivan automáticamente.</p>
 
-      {KO_ROUNDS.map((round) => {
-        const selected = new Set(results?.knockouts?.[round.key] || []);
-        return (
-          <div key={round.key} className="bracket-wrap" style={{ overflowX: 'visible' }}>
-            <div className="knockout-meta">
-              <span className="bracket-col-head" style={{ border: 0, padding: 0, margin: 0, textAlign: 'left' }}>
-                {round.label}
-              </span>
-              <span className="text-xs text-muted mono">{selected.size} / {round.count} equipos</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
-              {allTeams.map((t) => {
-                const isSel = selected.has(t);
-                const disabled = !isSel && selected.size >= round.count;
-                return (
-                  <button
-                    key={t}
-                    className={`bracket-slot ${isSel ? 'correct' : ''}`}
-                    onClick={() => toggleTeamInRound(round.key, t, round.count)}
-                    disabled={disabled}
-                    style={{ opacity: disabled ? 0.25 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
-                  >
-                    <span className="flag">{TEAMS[t].flag}</span>
-                    <span className="nm">{TEAMS[t].name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+      <div className="bracket-wrap" style={{ overflowX: 'auto' }}>
+        <div className="bracket-tree-v2">
+          {KO_ROUNDS.map((round) => {
+            const matches = realBracket[round.key] || [];
+            const picks = results?.knockouts?.[round.key] || [];
+            const filledCount = picks.filter(Boolean).length;
+            return (
+              <div key={round.key} className={`bracket-round col-${round.key}`}>
+                <div className="bracket-round-head">
+                  <div className="bracket-round-title">{round.label}</div>
+                  <div className="bracket-round-meta">
+                    <span className="mono">{filledCount}/{round.count}</span>
+                    <span className="bracket-round-dates">{round.dates}</span>
+                  </div>
+                </div>
+                <div className="bracket-matches">
+                  {matches.map((m, idx) => {
+                    const [teamA, teamB] = m.teams;
+                    const [labelA, labelB] = m.teamsLabel;
+                    const winner = m.winner;
+                    return (
+                      <div key={m.id} className="bracket-match">
+                        <button
+                          type="button"
+                          className={`team-pick ${winner === teamA && teamA ? 'selected' : ''} ${!teamA ? 'unresolved' : ''}`}
+                          onClick={() => teamA && setMatchWinnerAdmin(round.key, idx, teamA)}
+                          disabled={!teamA}
+                        >
+                          {teamA ? (
+                            <>
+                              <span className="team-pick-flag">{TEAMS[teamA]?.flag}</span>
+                              <span className="team-pick-name">{TEAMS[teamA]?.short || TEAMS[teamA]?.name}</span>
+                              {winner === teamA && <span className="team-pick-check">✓</span>}
+                            </>
+                          ) : (
+                            <span className="team-pick-placeholder">{labelA}</span>
+                          )}
+                        </button>
+                        <div className="bracket-vs">vs</div>
+                        <button
+                          type="button"
+                          className={`team-pick ${winner === teamB && teamB ? 'selected' : ''} ${!teamB ? 'unresolved' : ''}`}
+                          onClick={() => teamB && setMatchWinnerAdmin(round.key, idx, teamB)}
+                          disabled={!teamB}
+                        >
+                          {teamB ? (
+                            <>
+                              <span className="team-pick-flag">{TEAMS[teamB]?.flag}</span>
+                              <span className="team-pick-name">{TEAMS[teamB]?.short || TEAMS[teamB]?.name}</span>
+                              {winner === teamB && <span className="team-pick-check">✓</span>}
+                            </>
+                          ) : (
+                            <span className="team-pick-placeholder">{labelB}</span>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <h2 className="section-title" style={{ fontSize: 22, marginTop: 48 }}>Resultados — Especiales</h2>
       <div className="specials-grid">

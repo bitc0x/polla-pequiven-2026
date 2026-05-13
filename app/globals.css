@@ -1489,6 +1489,177 @@ button.bracket-slot {
   color: var(--text);
 }
 
+/* ============ BRACKET V2 (MATCHUP-BASED) ============ */
+
+.bracket-tree-v2 {
+  display: grid;
+  grid-template-columns: 2.2fr 1.5fr 1fr 1fr 0.9fr;
+  gap: 16px;
+  align-items: start;
+  min-width: 980px;
+}
+
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.bracket-round-head {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.bracket-round-title {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--pequiven-red-bright);
+  text-transform: uppercase;
+}
+
+.bracket-round-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 9px;
+}
+
+.bracket-round-meta .mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--text);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.bracket-round-dates {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.bracket-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bracket-match {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.bracket-match.correct { border-color: var(--green); }
+.bracket-match.incorrect { border-color: var(--pequiven-red); }
+
+.bracket-vs {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  padding: 1px 0;
+}
+
+.team-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  height: 28px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: left;
+  width: 100%;
+}
+
+.team-pick:hover:not(:disabled):not(.unresolved) {
+  border-color: var(--border-bright);
+  background: var(--bg-elevated);
+}
+
+.team-pick.selected {
+  background: linear-gradient(180deg, rgba(52, 199, 89, 0.18), rgba(52, 199, 89, 0.08));
+  border-color: var(--green);
+  color: var(--text);
+}
+
+.team-pick.selected.real {
+  /* both selected + actual winner = correct pick */
+  box-shadow: 0 0 0 1px var(--green) inset;
+}
+
+.team-pick.unresolved {
+  background: transparent;
+  border-style: dashed;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.team-pick:disabled {
+  cursor: not-allowed;
+}
+
+.team-pick-flag {
+  font-size: 14px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.team-pick-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.team-pick-placeholder {
+  flex: 1;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.team-pick-check {
+  font-size: 12px;
+  color: var(--green);
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .bracket-tree-v2 { min-width: 880px; }
+  .team-pick { font-size: 10px; height: 26px; padding: 4px 6px; }
+  .team-pick-flag { font-size: 13px; }
+  .team-pick-placeholder { font-size: 9px; }
+}
+
 /* ============ STANDINGS PREVIEW ============ */
 
 .standings-preview {

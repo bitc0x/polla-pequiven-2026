@@ -61,33 +61,68 @@ function findGroupMatch(oTeam1, oTeam2, oGroup) {
   return null;
 }
 
-// Compute knockout team lists from openfootball matches
-// A team is "in round X" if they appear as team1 or team2 in a match of that round
-// (whether or not the match has been played yet — but only if the team name
-// is a real team name, not a placeholder like "W74" or "1A")
-function deriveKnockouts(matches) {
-  const rounds = {
-    'Round of 32': new Set(),
-    'Round of 16': new Set(),
-    'Quarter-final': new Set(),
-    'Semi-final': new Set(),
-    'Final': new Set(),
+// Compute knockout match winners by index per round, ordered by match num.
+// Returns: { r32: [winner team codes, indexed by match 0..15], r16: [...], ... }
+// A team is the winner if they won FT or via ET/PK. Match index = position
+// within the round's R32_MATCHES / R16_MATCHES etc.
+function deriveKnockoutWinners(matches) {
+  const ROUND_KEY = {
+    'Round of 32': 'r32',
+    'Round of 16': 'r16',
+    'Quarter-final': 'qf',
+    'Semi-final': 'sf',
+    'Final': 'final',
   };
+  const ROUND_COUNTS = { r32: 16, r16: 8, qf: 4, sf: 2, final: 1 };
+  const byRound = { r32: [], r16: [], qf: [], sf: [], final: [] };
+
+  // Group matches by round, then sort by match num
+  const grouped = { r32: [], r16: [], qf: [], sf: [], final: [] };
   for (const m of matches) {
-    const r = m.round;
-    if (!(r in rounds)) continue;
-    for (const teamName of [m.team1, m.team2]) {
-      const code = codeFor(teamName);
-      if (code) rounds[r].add(code);
-    }
+    const rk = ROUND_KEY[m.round];
+    if (!rk) continue;
+    grouped[rk].push(m);
   }
-  return {
-    r32: Array.from(rounds['Round of 32']),
-    r16: Array.from(rounds['Round of 16']),
-    qf: Array.from(rounds['Quarter-final']),
-    sf: Array.from(rounds['Semi-final']),
-    final: Array.from(rounds['Final']),
-  };
+  for (const rk of Object.keys(grouped)) {
+    grouped[rk].sort((a, b) => (a.num || 0) - (b.num || 0));
+  }
+
+  function winnerOf(m) {
+    if (!m.score) return null;
+    const ft = m.score.ft;
+    if (Array.isArray(ft) && ft.length === 2) {
+      const h = parseInt(ft[0]);
+      const a = parseInt(ft[1]);
+      if (!isNaN(h) && !isNaN(a)) {
+        if (h > a) return codeFor(m.team1);
+        if (a > h) return codeFor(m.team2);
+        // Tied at FT, check ET then PK
+        if (Array.isArray(m.score.et) && m.score.et.length === 2) {
+          const eh = parseInt(m.score.et[0]);
+          const ea = parseInt(m.score.et[1]);
+          if (eh > ea) return codeFor(m.team1);
+          if (ea > eh) return codeFor(m.team2);
+        }
+        if (Array.isArray(m.score.p) && m.score.p.length === 2) {
+          const ph = parseInt(m.score.p[0]);
+          const pa = parseInt(m.score.p[1]);
+          if (ph > pa) return codeFor(m.team1);
+          if (pa > ph) return codeFor(m.team2);
+        }
+      }
+    }
+    return null;
+  }
+
+  for (const rk of Object.keys(grouped)) {
+    const winners = new Array(ROUND_COUNTS[rk]).fill(null);
+    grouped[rk].forEach((m, i) => {
+      if (i >= ROUND_COUNTS[rk]) return;
+      winners[i] = winnerOf(m);
+    });
+    byRound[rk] = winners;
+  }
+  return byRound;
 }
 
 // Compute total goals scored in tournament (tiebreaker)
@@ -149,16 +184,18 @@ export async function GET(request) {
       results.groupMatchesUpdated++;
     }
 
-    // 2) Knockout team lists
-    const ko = deriveKnockouts(matches);
+    // 2) Knockout match winners (by match index per round)
+    const ko = deriveKnockoutWinners(matches);
     results.knockoutCounts = {
-      r32: ko.r32.length, r16: ko.r16.length, qf: ko.qf.length,
-      sf: ko.sf.length, final: ko.final.length,
+      r32: ko.r32.filter(Boolean).length,
+      r16: ko.r16.filter(Boolean).length,
+      qf:  ko.qf.filter(Boolean).length,
+      sf:  ko.sf.filter(Boolean).length,
+      final: ko.final.filter(Boolean).length,
     };
     if (!dryRun) {
-      // Only write if there's data to avoid clobbering admin manual entries
       for (const [k, v] of Object.entries(ko)) {
-        if (v.length > 0) {
+        if (v.some(Boolean)) {
           await set(ref(db, `${DB_ROOT}/results/knockouts/${k}`), v);
         }
       }
