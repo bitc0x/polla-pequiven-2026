@@ -215,15 +215,8 @@ input[type="number"]::-webkit-inner-spin-button {
   width: 56px;
   height: 56px;
   flex-shrink: 0;
-  background: var(--text);
-  border-radius: 12px;
-  padding: 6px;
   display: grid;
   place-items: center;
-}
-
-:root[data-theme="light"] .brand-logo-img {
-  background: var(--bg);
 }
 
 .brand-logo-img img {
@@ -393,15 +386,8 @@ input[type="number"]::-webkit-inner-spin-button {
   width: 36px;
   height: 36px;
   flex-shrink: 0;
-  background: var(--text);
-  border-radius: 8px;
-  padding: 4px;
   display: grid;
   place-items: center;
-}
-
-:root[data-theme="light"] .header-logo-img {
-  background: var(--bg);
 }
 
 .header-logo-img img {
