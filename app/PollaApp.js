@@ -20,8 +20,22 @@ const ADMIN_PASSWORD = 'Tnslppbntso1*';
 
 // ============ FIREBASE HELPERS ============
 const dbPath = (sub) => ref(db, `${DB_ROOT}/${sub}`);
-const dbSet = (sub, data) => set(dbPath(sub), data);
-const dbRemove = (sub) => remove(dbPath(sub));
+const dbSet = (sub, data) => {
+  return set(dbPath(sub), data).catch((err) => {
+    console.error(`[Firebase write failed at ${sub}]`, err);
+    // Surface to global error handler so the UI can show a banner
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('firebase-write-error', {
+        detail: { path: sub, message: err?.message || String(err) }
+      }));
+    }
+    throw err;
+  });
+};
+const dbRemove = (sub) => remove(dbPath(sub)).catch((err) => {
+  console.error(`[Firebase remove failed at ${sub}]`, err);
+  throw err;
+});
 
 const slug = (s) => String(s).toLowerCase()
   .replace(/[^a-z0-9]+/g, '-')
@@ -1312,6 +1326,15 @@ export default function PollaApp() {
   const [config, setConfig] = useState({ locked: false });
   const [syncMeta, setSyncMeta] = useState(null);
   const [pmOdds, setPmOdds] = useState(null);
+  const [writeError, setWriteError] = useState(null);
+
+  useEffect(() => {
+    function handler(e) {
+      setWriteError(e.detail?.message || 'Error al guardar');
+    }
+    window.addEventListener('firebase-write-error', handler);
+    return () => window.removeEventListener('firebase-write-error', handler);
+  }, []);
 
   useEffect(() => {
     setHydrated(true);
@@ -1591,6 +1614,15 @@ export default function PollaApp() {
           </div>
         </div>
       </header>
+
+      {writeError && (
+        <div className="error-banner">
+          <div>
+            <strong>Error al guardar:</strong> {writeError}. Tus cambios no están persistiendo en la base de datos. Avisa al admin.
+          </div>
+          <button onClick={() => setWriteError(null)} aria-label="Cerrar">×</button>
+        </div>
+      )}
 
       <div className="page">
         <div className="tabs-bar">

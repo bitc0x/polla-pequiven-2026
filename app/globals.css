@@ -347,6 +347,44 @@ input[type="number"]::-webkit-inner-spin-button {
   text-transform: uppercase;
 }
 
+/* ============ ERROR BANNER ============ */
+
+.error-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--pequiven-red);
+  color: white;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.error-banner strong { font-weight: 800; }
+
+.error-banner button {
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.error-banner button:hover {
+  background: rgba(255,255,255,0.28);
+}
+
 /* ============ SUBMIT STATUS BADGE (HEADER) ============ */
 
 .submit-badge {
