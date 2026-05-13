@@ -282,11 +282,21 @@ function PrizePool({ players }) {
 }
 
 // ============ GROUP STAGE ============
-function GroupStageScreen({ predictions, results, locked, onUpdate, showResults, pmOdds }) {
+function GroupStageScreen({ predictions, results, locked, onUpdate, showResults, pmOdds, onReset }) {
   function update(matchId, field, value) {
     if (locked) return;
     const clean = value === '' ? null : Math.max(0, Math.min(20, parseInt(value) || 0));
     onUpdate(matchId, field, clean);
+  }
+
+  const filled = Object.values(predictions?.groupMatches || {}).filter(m => m && m.home != null && m.away != null).length;
+
+  function handleReset() {
+    if (locked || !onReset) return;
+    const msg = filled > 0
+      ? `¿Borrar tus ${filled} predicciones de fase de grupos? También se limpian tus picks de llaves (R32 al Final) porque dependen de los grupos. Esta acción es irreversible.`
+      : '¿Limpiar fase de grupos y llaves? No tienes predicciones aún pero esto resetea cualquier dato residual.';
+    if (window.confirm(msg)) onReset();
   }
 
   function MatchOdds({ matchId }) {
@@ -329,11 +339,23 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults,
   return (
     <div>
       <CountdownBox locked={locked} />
-      <h2 className="section-title">Fase de Grupos</h2>
+      <div className="section-title-row">
+        <h2 className="section-title" style={{ margin: 0 }}>Fase de Grupos</h2>
+        {!locked && onReset && (
+          <button
+            type="button"
+            className="btn-ghost btn-reset"
+            onClick={handleReset}
+            title="Borra tus predicciones de fase de grupos y llaves"
+          >
+            <Icon name="refresh" size={12} /> Resetear
+          </button>
+        )}
+      </div>
       <p className="section-sub">
         {locked
           ? 'Predicciones cerradas. Solo lectura.'
-          : 'Predice el marcador exacto de cada partido. Acierto exacto = 5 pts. Solo ganador = 2 pts. Diferencia de goles correcta = +1 pt bonus.'}
+          : `Predice el marcador exacto de cada partido. Acierto exacto = 5 pts. Solo ganador = 2 pts. Diferencia de goles correcta = +1 pt bonus. Llevas ${filled}/72.`}
         {' '}
         Las probabilidades 1X2 vienen de Polymarket en vivo. Click para tradear.
       </p>
@@ -1608,6 +1630,25 @@ export default function PollaApp() {
     dbSet(`results/tiebreaker/${field}`, clean);
   }
 
+  // User-level reset: wipe this player's group predictions and ALL knockout
+  // picks. Specials stay (Champion etc.) since they're not derived from groups.
+  // Knockouts are wiped because they depend on group standings.
+  function resetMyGroupAndKnockouts() {
+    if (!playerId || locked) return;
+    // Optimistic local: clear in state
+    setPredictions(prev => {
+      const next = JSON.parse(JSON.stringify(prev || {}));
+      if (next[playerId]) {
+        next[playerId].groupMatches = {};
+        next[playerId].knockouts = {};
+      }
+      return next;
+    });
+    // Persist: remove from Firebase
+    dbRemove(`predictions/${playerId}/groupMatches`);
+    dbRemove(`predictions/${playerId}/knockouts`);
+  }
+
   function setPaymentStatus(pid, newStatus) {
     const update = { paymentStatus: newStatus };
     if (newStatus === 'pending') update.pendingSince = Date.now();
@@ -1797,6 +1838,7 @@ export default function PollaApp() {
               onUpdate={updateGroupMatch}
               showResults={showResults}
               pmOdds={pmOdds}
+              onReset={user.isAdmin ? null : resetMyGroupAndKnockouts}
             />
           )}
           {tab === 'llaves' && (

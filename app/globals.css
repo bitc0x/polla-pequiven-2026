@@ -347,6 +347,38 @@ input[type="number"]::-webkit-inner-spin-button {
   text-transform: uppercase;
 }
 
+/* ============ SECTION TITLE WITH RESET BUTTON ============ */
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 32px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px !important;
+  font-size: 10px !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: 100px !important;
+  color: var(--text-dim) !important;
+  border: 1px solid var(--border) !important;
+  transition: all 0.15s;
+}
+
+.btn-reset:hover {
+  border-color: var(--pequiven-red) !important;
+  color: var(--pequiven-red-bright) !important;
+  background: rgba(200, 16, 46, 0.08) !important;
+}
+
 /* ============ ERROR BANNER ============ */
 
 .error-banner {
