@@ -1558,6 +1558,20 @@ export default function PollaApp() {
             </div>
           </div>
           <div className="header-right">
+            {!user.isAdmin && (
+              <button
+                className={`submit-badge ${locked ? 'locked' : (submittedByMe ? 'submitted' : 'draft')}`}
+                onClick={() => setTab('mis-picks')}
+                title={locked
+                  ? 'Polla cerrada'
+                  : (submittedByMe ? 'Picks enviados. Click para revertir.' : 'Borrador. Click para enviar definitivos.')}
+              >
+                <span className="submit-badge-dot" />
+                <span className="submit-badge-label">
+                  {locked ? 'CERRADA' : (submittedByMe ? 'ENVIADO' : 'BORRADOR')}
+                </span>
+              </button>
+            )}
             <MusicToggle />
             <ThemeToggle />
             <div className={`user-pill ${user.isAdmin ? 'admin' : ''}`}>
@@ -1616,6 +1630,16 @@ export default function PollaApp() {
             <div className="submitted-banner">
               <div>
                 <strong>Predicciones enviadas.</strong> Para editar, ve a <em>Mis Picks</em> y presiona <em>Revertir</em>. Disponible hasta el 11 de junio.
+              </div>
+              <button className="btn-ghost" onClick={() => setTab('mis-picks')}>
+                Ir a Mis Picks
+              </button>
+            </div>
+          )}
+          {!user.isAdmin && submittedByMe && !locked && (tab === 'grupos' || tab === 'llaves' || tab === 'especiales') && (
+            <div className="submitted-banner">
+              <div>
+                <strong>Picks enviados.</strong> Si quieres cambiar algo, primero revierte. Tienes hasta el 11 de junio.
               </div>
               <button className="btn-ghost" onClick={() => setTab('mis-picks')}>
                 Ir a Mis Picks

@@ -347,6 +347,95 @@ input[type="number"]::-webkit-inner-spin-button {
   text-transform: uppercase;
 }
 
+/* ============ SUBMIT STATUS BADGE (HEADER) ============ */
+
+.submit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 100px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  transition: all 0.15s;
+}
+
+.submit-badge:hover {
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+}
+
+.submit-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.submit-badge.draft {
+  border-color: rgba(212, 175, 55, 0.35);
+  background: rgba(212, 175, 55, 0.06);
+}
+.submit-badge.draft .submit-badge-dot {
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.6);
+  animation: pulse 2s ease-in-out infinite;
+}
+.submit-badge.draft .submit-badge-label { color: var(--gold); }
+
+.submit-badge.submitted {
+  border-color: rgba(52, 199, 89, 0.35);
+  background: rgba(52, 199, 89, 0.06);
+}
+.submit-badge.submitted .submit-badge-dot {
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(52, 199, 89, 0.5);
+}
+.submit-badge.submitted .submit-badge-label { color: var(--green); }
+
+.submit-badge.locked {
+  border-color: rgba(200, 16, 46, 0.35);
+  background: rgba(200, 16, 46, 0.06);
+}
+.submit-badge.locked .submit-badge-dot {
+  background: var(--pequiven-red-bright);
+}
+.submit-badge.locked .submit-badge-label { color: var(--pequiven-red-bright); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (max-width: 640px) {
+  .submit-badge-label { display: none; }
+  .submit-badge { padding: 8px; }
+}
+
+/* ============ SUBMITTED INLINE BANNER (on edit tabs) ============ */
+
+.submitted-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  background: linear-gradient(90deg, rgba(52, 199, 89, 0.08), transparent);
+  border: 1px solid rgba(52, 199, 89, 0.3);
+  border-left: 3px solid var(--green);
+  border-radius: 6px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.submitted-banner strong { color: var(--green); }
+
 /* ============ APP HEADER ============ */
 
 .app-header {
