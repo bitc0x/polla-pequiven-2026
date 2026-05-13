@@ -425,7 +425,7 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults,
 }
 
 // ============ KNOCKOUT BRACKET VISUAL ============
-function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults }) {
+function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults, onReset }) {
   // Build the bracket: resolve R32 matchups from group standings, then R16
   // matchups from R32 winner picks, and so on through Final.
   const bracket = useMemo(() => buildBracket(predictions), [predictions]);
@@ -439,15 +439,12 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
     // Toggle off if clicking the same selection again
     current[matchIdx] = (current[matchIdx] === teamCode) ? null : (teamCode || null);
     onUpdateKO(roundKey, current);
-    // If this round changed, downstream picks may now be inconsistent. Clear
-    // any downstream picks that no longer have a valid team (e.g. user
-    // changed R32 winner so R16 has a feeder change). We don't auto-clear;
-    // instead, the stale picks will be visually flagged in the next render.
   }
 
   const groupMatchesFilled = Object.values(predictions?.groupMatches || {}).filter(m => m && m.home != null && m.away != null).length;
   const groupStageIncomplete = groupMatchesFilled < 72;
   const allGroupsComplete = groupMatchesFilled === 72;
+  const koPicksTotal = ['r32','r16','qf','sf','final'].reduce((acc, k) => acc + (predictions?.knockouts?.[k]?.filter(Boolean).length || 0), 0);
 
   // Count winners per round and whether previous round is fully picked
   function roundReady(roundKey) {
@@ -459,9 +456,29 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
     return prevMatches.every((_, i) => !!prevPicks[i]);
   }
 
+  function handleReset() {
+    if (locked || !onReset) return;
+    const msg = koPicksTotal > 0
+      ? `¿Borrar tus ${koPicksTotal} picks de llaves (R32 al Final)? Tu fase de grupos no se toca. Esta acción es irreversible.`
+      : '¿Limpiar llaves? Resetea cualquier dato residual.';
+    if (window.confirm(msg)) onReset();
+  }
+
   return (
     <div>
-      <h2 className="section-title">Llaves Eliminatorias</h2>
+      <div className="section-title-row">
+        <h2 className="section-title" style={{ margin: 0 }}>Llaves Eliminatorias</h2>
+        {!locked && onReset && (
+          <button
+            type="button"
+            className="btn-ghost btn-reset"
+            onClick={handleReset}
+            title="Borra tus picks de llaves (R32 al Final)"
+          >
+            <Icon name="refresh" size={12} /> Resetear
+          </button>
+        )}
+      </div>
       <p className="section-sub">
         {locked
           ? 'Llaves cerradas. Solo lectura.'
@@ -1635,7 +1652,6 @@ export default function PollaApp() {
   // Knockouts are wiped because they depend on group standings.
   function resetMyGroupAndKnockouts() {
     if (!playerId || locked) return;
-    // Optimistic local: clear in state
     setPredictions(prev => {
       const next = JSON.parse(JSON.stringify(prev || {}));
       if (next[playerId]) {
@@ -1644,8 +1660,21 @@ export default function PollaApp() {
       }
       return next;
     });
-    // Persist: remove from Firebase
     dbRemove(`predictions/${playerId}/groupMatches`);
+    dbRemove(`predictions/${playerId}/knockouts`);
+  }
+
+  // Reset only knockouts: when the user wants to redo R32-Final without
+  // touching group predictions.
+  function resetMyKnockoutsOnly() {
+    if (!playerId || locked) return;
+    setPredictions(prev => {
+      const next = JSON.parse(JSON.stringify(prev || {}));
+      if (next[playerId]) {
+        next[playerId].knockouts = {};
+      }
+      return next;
+    });
     dbRemove(`predictions/${playerId}/knockouts`);
   }
 
@@ -1848,6 +1877,7 @@ export default function PollaApp() {
               locked={editLocked}
               onUpdateKO={updateKO}
               showResults={showResults}
+              onReset={user.isAdmin ? null : resetMyKnockoutsOnly}
             />
           )}
           {tab === 'especiales' && (

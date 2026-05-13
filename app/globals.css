@@ -982,172 +982,16 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-overflow-scrolling: touch;
 }
 
-.bracket-tree {
-  display: grid;
-  grid-template-columns: 2.2fr 1.5fr 1fr 1fr 1fr;
-  gap: 14px;
-  align-items: start;
-  min-width: 880px;
-}
-
-.bracket-col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.bracket-col-head {
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-}
-
-.bracket-col-title {
-  font-family: 'Archivo Black', sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: var(--pequiven-red-bright);
-  text-transform: uppercase;
-}
-
-.bracket-col-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-}
-
-.bracket-col-meta .mono {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
-  color: var(--text);
-  font-size: 10px;
-}
-
-.bracket-col-dates {
-  color: var(--text-dim);
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-}
-
-.bracket-slots.one-col {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.bracket-slots.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-}
-
-.bracket-slot {
+.bracket-empty-state {
+  padding: 16px 12px;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1px dashed var(--border);
   border-radius: 4px;
-  padding: 0 8px;
-  height: 26px;
-  font-size: 11px;
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  color: var(--text);
-  width: 100%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  transition: all 0.15s;
-}
-
-select.bracket-slot {
-  /* Cleanup native select chrome */
-  appearance: none;
-  -webkit-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
-    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
-  background-position:
-    calc(100% - 9px) 50%,
-    calc(100% - 5px) 50%;
-  background-size: 4px 4px;
-  background-repeat: no-repeat;
-  padding-right: 18px;
-}
-
-div.bracket-slot,
-button.bracket-slot {
-  cursor: default;
-}
-
-button.bracket-slot {
-  cursor: pointer;
-}
-
-.bracket-slot:hover {
-  border-color: var(--border-bright);
-  background: var(--bg);
-}
-
-.bracket-slot:focus {
-  outline: none;
-  border-color: var(--pequiven-red);
-  box-shadow: 0 0 0 2px rgba(200, 16, 46, 0.15);
-}
-
-.bracket-slot.empty {
+  font-size: 10px;
   color: var(--text-dim);
-}
-
-.bracket-slot:not(.empty):not(.correct):not(.incorrect) {
-  border-color: rgba(52, 199, 89, 0.3);
-  background: linear-gradient(180deg, rgba(52, 199, 89, 0.05), transparent);
-}
-
-.bracket-slot.correct {
-  border-color: var(--green);
-  background: rgba(52, 199, 89, 0.12);
-  color: var(--green);
-}
-
-.bracket-slot.incorrect {
-  border-color: var(--pequiven-red);
-  background: rgba(200, 16, 46, 0.1);
-  color: var(--pequiven-red-bright);
-  text-decoration: line-through;
-  text-decoration-color: rgba(200, 16, 46, 0.5);
-}
-
-.bracket-slot .flag {
-  font-size: 13px;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-.bracket-slot .nm {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-
-.bracket-slot .nm.dim {
-  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.5;
   font-style: italic;
-}
-
-/* Mobile: stack columns vertically with horizontal scroll for tree maintained */
-@media (max-width: 640px) {
-  .bracket-tree { min-width: 760px; }
-  .bracket-col-title { font-size: 10px; letter-spacing: 0.15em; }
-  .bracket-slot { font-size: 10px; height: 24px; }
-  .bracket-slot .flag { font-size: 12px; }
 }
 
 .knockout-meta {
@@ -1820,30 +1664,6 @@ button.bracket-slot {
   text-align: center;
   line-height: 1.5;
   font-style: italic;
-}
-
-/* ============ STALE BRACKET PICK ============ */
-
-.bracket-slot.stale {
-  border-color: var(--gold);
-  background: rgba(212, 175, 55, 0.08);
-  color: var(--gold);
-}
-
-.bracket-slot.stale::after {
-  content: '!';
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Archivo Black', sans-serif;
-  font-size: 9px;
-  color: var(--bg);
-  background: var(--gold);
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  margin-left: auto;
-  flex-shrink: 0;
 }
 
 /* ============ POLYMARKET ODDS ROW ============ */
