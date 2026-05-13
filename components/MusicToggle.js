@@ -66,7 +66,7 @@ export default function MusicToggle() {
         aria-label={playing ? 'Pausar música' : 'Reproducir música'}
         aria-pressed={playing}
         onClick={toggle}
-        title={playing ? 'Pausar música' : 'Reproducir música del mundial'}
+        title={playing ? 'Pausar música' : 'Reproducir música'}
       >
         <Icon name={playing ? 'music' : 'music-off'} />
       </button>

@@ -32,17 +32,19 @@ export default function ThemeToggle() {
   // Avoid hydration mismatch by rendering a stable placeholder on the server
   if (!mounted) {
     return (
-      <button className="icon-btn" type="button" aria-label="Cambiar tema">
+      <button className="icon-btn" type="button" aria-label="Cambiar tema" title="Cambiar tema">
         <Icon name="sun" />
       </button>
     );
   }
 
+  const label = theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
   return (
     <button
       className="icon-btn"
       type="button"
-      aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      aria-label={label}
+      title={label}
       onClick={toggle}
     >
       <Icon name={theme === 'dark' ? 'sun' : 'moon'} />

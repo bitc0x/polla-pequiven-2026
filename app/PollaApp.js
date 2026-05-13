@@ -347,7 +347,7 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults,
                         <div className="score-input-pair">
                           <input
                             type="number"
-                            className="score-input"
+                            className={`score-input ${pred.home != null ? 'has-value' : ''}`}
                             value={pred.home ?? ''}
                             onChange={(e) => update(match.id, 'home', e.target.value)}
                             disabled={locked}
@@ -356,7 +356,7 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults,
                           <span className="score-sep">·</span>
                           <input
                             type="number"
-                            className="score-input"
+                            className={`score-input ${pred.away != null ? 'has-value' : ''}`}
                             value={pred.away ?? ''}
                             onChange={(e) => update(match.id, 'away', e.target.value)}
                             disabled={locked}
@@ -409,55 +409,77 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
       <h2 className="section-title">Llaves Eliminatorias</h2>
       <p className="section-sub">
         {locked
-          ? 'Llaves cerradas.'
-          : 'Predice qué selecciones llegan a cada ronda. R32 = 3 pts cada acierto · Octavos = 6 · Cuartos = 12 · Semis = 25 · Final = 50.'}
+          ? 'Llaves cerradas. Solo lectura.'
+          : 'Cada selección que aciertes en cada ronda te da puntos. No predices el cruce, solo qué equipos sobreviven a cada ronda.'}
       </p>
+
+      <div className="bracket-legend">
+        {KO_ROUNDS.map((r) => (
+          <span key={r.key} className="bracket-legend-item">
+            <strong>{r.label}</strong>
+            <span className="dim">{r.pointsTeam}pts c/u</span>
+          </span>
+        ))}
+      </div>
 
       <div className="bracket-wrap">
         <div className="bracket-tree">
           {KO_ROUNDS.map((round) => {
             const realSet = new Set(results?.knockouts?.[round.key] || []);
+            const picks = predictions?.knockouts?.[round.key] || [];
+            const filledCount = picks.filter(Boolean).length;
+
+            // R32 and R16 get internal 2-column grids to keep height contained.
+            // QF, SF, Final stay single column.
+            const useGrid = round.count >= 16;
+
             return (
-              <div key={round.key} className="bracket-col">
+              <div key={round.key} className={`bracket-col col-${round.key}`}>
                 <div className="bracket-col-head">
-                  {round.label}
-                  <span className="sub">{round.dates} · {round.pointsTeam}pts c/u</span>
+                  <div className="bracket-col-title">{round.label}</div>
+                  <div className="bracket-col-meta">
+                    <span className="mono">{filledCount}/{round.count}</span>
+                    <span className="bracket-col-dates">{round.dates}</span>
+                  </div>
                 </div>
-                {Array.from({ length: round.count }).map((_, i) => {
-                  const val = getSlot(round.key, i);
-                  let cls = 'bracket-slot';
-                  if (!val) cls += ' empty';
-                  if (showResults && val) {
-                    cls += realSet.has(val) ? ' correct' : ' incorrect';
-                  }
-                  if (locked) {
+                <div className={`bracket-slots ${useGrid ? 'two-col' : 'one-col'}`}>
+                  {Array.from({ length: round.count }).map((_, i) => {
+                    const val = getSlot(round.key, i);
+                    let cls = 'bracket-slot';
+                    if (!val) cls += ' empty';
+                    if (showResults && val) {
+                      cls += realSet.has(val) ? ' correct' : ' incorrect';
+                    }
+                    if (locked) {
+                      return (
+                        <div key={i} className={cls}>
+                          {val ? (
+                            <>
+                              <span className="flag">{TEAMS[val]?.flag}</span>
+                              <span className="nm">{TEAMS[val]?.short || TEAMS[val]?.name}</span>
+                            </>
+                          ) : (
+                            <span className="nm dim">—</span>
+                          )}
+                        </div>
+                      );
+                    }
                     return (
-                      <div key={i} className={cls}>
-                        {val ? (
-                          <>
-                            <span className="flag">{TEAMS[val]?.flag}</span>
-                            <span className="nm">{TEAMS[val]?.name}</span>
-                          </>
-                        ) : (
-                          <span className="nm">— sin predicción —</span>
-                        )}
-                      </div>
+                      <select
+                        key={i}
+                        className={cls}
+                        value={val}
+                        onChange={(e) => setSlot(round.key, i, e.target.value)}
+                        aria-label={`${round.label} slot ${i + 1}`}
+                      >
+                        <option value="">—</option>
+                        {allTeams.map((t) => (
+                          <option key={t} value={t}>{TEAMS[t].flag} {TEAMS[t].name}</option>
+                        ))}
+                      </select>
                     );
-                  }
-                  return (
-                    <select
-                      key={i}
-                      className={cls}
-                      value={val}
-                      onChange={(e) => setSlot(round.key, i, e.target.value)}
-                    >
-                      <option value="">— #{i + 1} —</option>
-                      {allTeams.map((t) => (
-                        <option key={t} value={t}>{TEAMS[t].flag} {TEAMS[t].name}</option>
-                      ))}
-                    </select>
-                  );
-                })}
+                  })}
+                </div>
               </div>
             );
           })}
@@ -1087,14 +1109,14 @@ function AdminScreen({
                     </div>
                     <div className="score-input-pair">
                       <input
-                        type="number" className="score-input"
+                        type="number" className={`score-input ${real.home != null ? 'has-value' : ''}`}
                         value={real.home ?? ''}
                         onChange={(e) => updateMatch(match.id, 'home', e.target.value)}
                         min="0" max="20"
                       />
                       <span className="score-sep">·</span>
                       <input
-                        type="number" className="score-input"
+                        type="number" className={`score-input ${real.away != null ? 'has-value' : ''}`}
                         value={real.away ?? ''}
                         onChange={(e) => updateMatch(match.id, 'away', e.target.value)}
                         min="0" max="20"
@@ -1308,7 +1330,7 @@ export default function PollaApp() {
   const showSave = useCallback((kind = 'saved') => {
     setSaveStatus('saving');
     setTimeout(() => setSaveStatus(kind), 200);
-    setTimeout(() => setSaveStatus(null), 1500);
+    setTimeout(() => setSaveStatus(null), 2400);
   }, []);
 
   function handleLogin(u) {
