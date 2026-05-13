@@ -9,7 +9,7 @@ import {
   KO_ROUNDS, SPECIAL_AWARDS, SCORING, TOURNAMENT_START,
   BUY_IN_USD, VENMO_HANDLE, PRIZE_SPLIT, PRIZE_LABELS,
 } from '@/lib/worldcup-data';
-import { scorePlayer, scoreMatchPrediction } from '@/lib/scoring';
+import { scorePlayer, scoreMatchPrediction, computeGroupStandings, computeR32Candidates } from '@/lib/scoring';
 import Avatar from '@/components/Avatar';
 import ThemeToggle from '@/components/ThemeToggle';
 import MusicToggle from '@/components/MusicToggle';
@@ -404,7 +404,18 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults,
 
 // ============ KNOCKOUT BRACKET VISUAL ============
 function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults }) {
-  const allTeams = Object.keys(TEAMS);
+  // CASCADE: candidates per round are derived from the previous round's picks.
+  // R32 candidates come from the user's own group stage predictions: top 2 of
+  // each group + best 8 third places (32 teams total per FIFA 2026 format).
+  // If the user hasn't filled all group matches yet, candidates may be < 32.
+  const r32Candidates = useMemo(() => computeR32Candidates(predictions), [predictions]);
+  const standings = useMemo(() => computeGroupStandings(predictions), [predictions]);
+
+  function candidatesFor(roundKey) {
+    if (roundKey === 'r32') return r32Candidates;
+    const prev = { r16: 'r32', qf: 'r16', sf: 'qf', final: 'sf' }[roundKey];
+    return (predictions?.knockouts?.[prev] || []).filter(Boolean);
+  }
 
   function getSlot(roundKey, i) {
     return predictions?.knockouts?.[roundKey]?.[i] || '';
@@ -418,14 +429,52 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
     onUpdateKO(roundKey, current);
   }
 
+  // Detect if group stage is incomplete enough to make R32 unreliable
+  const groupMatchesFilled = Object.values(predictions?.groupMatches || {}).filter(m => m && m.home != null && m.away != null).length;
+  const groupStageIncomplete = groupMatchesFilled < 72;
+
   return (
     <div>
       <h2 className="section-title">Llaves Eliminatorias</h2>
       <p className="section-sub">
         {locked
           ? 'Llaves cerradas. Solo lectura.'
-          : 'Cada selección que aciertes en cada ronda te da puntos. No predices el cruce, solo qué equipos sobreviven a cada ronda.'}
+          : 'Predice qué selecciones avanzan a cada ronda. Cada ronda muestra solo los equipos que tu pasaste de la ronda anterior, basado en tu fase de grupos.'}
       </p>
+
+      {!locked && groupStageIncomplete && (
+        <div className="warn-msg mb-6">
+          <strong>Tip:</strong> Tu fase de grupos está al {Math.round((groupMatchesFilled / 72) * 100)}%. Llaves usa tus predicciones de grupos para mostrarte los 32 equipos candidatos en R32. Llena fase de grupos primero para una experiencia más intuitiva.
+        </div>
+      )}
+
+      {/* Predicted standings preview */}
+      {!locked && groupMatchesFilled > 0 && (
+        <details className="standings-preview">
+          <summary>
+            <span>Ver mis standings predichas de fase de grupos</span>
+            <span className="hairline">{groupMatchesFilled}/72 partidos predichos</span>
+          </summary>
+          <div className="standings-grid">
+            {Object.entries(standings).map(([groupId, ranked]) => (
+              <div key={groupId} className="standings-group">
+                <div className="standings-head">Grupo {groupId}</div>
+                {ranked.map((s, idx) => (
+                  <div key={s.team} className={`standings-row pos-${idx + 1}`}>
+                    <span className="pos">{idx + 1}</span>
+                    <span className="flag">{TEAMS[s.team].flag}</span>
+                    <span className="nm">{TEAMS[s.team].short || TEAMS[s.team].name}</span>
+                    <span className="pts mono">{s.pts}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted mt-3" style={{ paddingLeft: 12 }}>
+            Top 2 de cada grupo (24) + mejores 8 terceros de los 12 grupos = 32 equipos en R32. Estos son los candidatos que aparecen en el dropdown de R32.
+          </p>
+        </details>
+      )}
 
       <div className="bracket-legend">
         {KO_ROUNDS.map((r) => (
@@ -442,10 +491,9 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
             const realSet = new Set(results?.knockouts?.[round.key] || []);
             const picks = predictions?.knockouts?.[round.key] || [];
             const filledCount = picks.filter(Boolean).length;
-
-            // R32 and R16 get internal 2-column grids to keep height contained.
-            // QF, SF, Final stay single column.
+            const candidates = candidatesFor(round.key);
             const useGrid = round.count >= 16;
+            const noCandidates = !locked && candidates.length === 0;
 
             return (
               <div key={round.key} className={`bracket-col col-${round.key}`}>
@@ -456,44 +504,64 @@ function KnockoutScreen({ predictions, results, locked, onUpdateKO, showResults 
                     <span className="bracket-col-dates">{round.dates}</span>
                   </div>
                 </div>
-                <div className={`bracket-slots ${useGrid ? 'two-col' : 'one-col'}`}>
-                  {Array.from({ length: round.count }).map((_, i) => {
-                    const val = getSlot(round.key, i);
-                    let cls = 'bracket-slot';
-                    if (!val) cls += ' empty';
-                    if (showResults && val) {
-                      cls += realSet.has(val) ? ' correct' : ' incorrect';
-                    }
-                    if (locked) {
+
+                {noCandidates ? (
+                  <div className="bracket-empty-state">
+                    {round.key === 'r32'
+                      ? 'Llena tu fase de grupos para ver los 32 candidatos.'
+                      : `Llena la ronda anterior para desbloquear ${round.label}.`}
+                  </div>
+                ) : (
+                  <div className={`bracket-slots ${useGrid ? 'two-col' : 'one-col'}`}>
+                    {Array.from({ length: round.count }).map((_, i) => {
+                      const val = getSlot(round.key, i);
+                      let cls = 'bracket-slot';
+                      if (!val) cls += ' empty';
+                      if (showResults && val) {
+                        cls += realSet.has(val) ? ' correct' : ' incorrect';
+                      }
+                      // If the current value is not in candidates (e.g., user
+                      // changed group preds and this team no longer qualifies),
+                      // flag it so the user knows
+                      const isStale = !locked && val && !candidates.includes(val);
+
+                      if (locked) {
+                        return (
+                          <div key={i} className={cls}>
+                            {val ? (
+                              <>
+                                <span className="flag">{TEAMS[val]?.flag}</span>
+                                <span className="nm">{TEAMS[val]?.short || TEAMS[val]?.name}</span>
+                              </>
+                            ) : (
+                              <span className="nm dim">—</span>
+                            )}
+                          </div>
+                        );
+                      }
+                      // Build option list: candidates only, with current value
+                      // included even if stale (so it's selectable to be removed)
+                      const optionList = [...candidates];
+                      if (val && !candidates.includes(val)) optionList.unshift(val);
+
                       return (
-                        <div key={i} className={cls}>
-                          {val ? (
-                            <>
-                              <span className="flag">{TEAMS[val]?.flag}</span>
-                              <span className="nm">{TEAMS[val]?.short || TEAMS[val]?.name}</span>
-                            </>
-                          ) : (
-                            <span className="nm dim">—</span>
-                          )}
-                        </div>
+                        <select
+                          key={i}
+                          className={`${cls} ${isStale ? 'stale' : ''}`}
+                          value={val}
+                          onChange={(e) => setSlot(round.key, i, e.target.value)}
+                          aria-label={`${round.label} slot ${i + 1}`}
+                          title={isStale ? 'Este equipo ya no califica según tus picks actuales. Reemplázalo o cambia tus predicciones de grupo.' : undefined}
+                        >
+                          <option value="">—</option>
+                          {optionList.map((t) => (
+                            <option key={t} value={t}>{TEAMS[t].flag} {TEAMS[t].name}</option>
+                          ))}
+                        </select>
                       );
-                    }
-                    return (
-                      <select
-                        key={i}
-                        className={cls}
-                        value={val}
-                        onChange={(e) => setSlot(round.key, i, e.target.value)}
-                        aria-label={`${round.label} slot ${i + 1}`}
-                      >
-                        <option value="">—</option>
-                        {allTeams.map((t) => (
-                          <option key={t} value={t}>{TEAMS[t].flag} {TEAMS[t].name}</option>
-                        ))}
-                      </select>
-                    );
-                  })}
-                </div>
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}

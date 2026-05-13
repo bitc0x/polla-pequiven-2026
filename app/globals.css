@@ -1489,6 +1489,160 @@ button.bracket-slot {
   color: var(--text);
 }
 
+/* ============ STANDINGS PREVIEW ============ */
+
+.standings-preview {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.standings-preview summary {
+  padding: 14px 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  list-style: none;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.standings-preview summary::-webkit-details-marker { display: none; }
+
+.standings-preview summary::before {
+  content: '▸';
+  color: var(--pequiven-red-bright);
+  margin-right: 4px;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.standings-preview[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.standings-preview summary:hover {
+  background: var(--bg-card);
+}
+
+.standings-preview summary .hairline {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+.standings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 16px;
+  padding-top: 4px;
+}
+
+.standings-group {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.standings-head {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--pequiven-red-bright);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+}
+
+.standings-row {
+  display: grid;
+  grid-template-columns: 18px 16px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.standings-row .pos {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.standings-row.pos-1 .pos { color: var(--green); }
+.standings-row.pos-2 .pos { color: var(--green); opacity: 0.7; }
+.standings-row.pos-3 .pos { color: var(--gold); }
+.standings-row.pos-4 .pos { color: var(--text-dim); }
+
+.standings-row .flag {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.standings-row .nm {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.standings-row .pts {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+/* ============ BRACKET EMPTY STATE ============ */
+
+.bracket-empty-state {
+  padding: 16px 12px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* ============ STALE BRACKET PICK ============ */
+
+.bracket-slot.stale {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.08);
+  color: var(--gold);
+}
+
+.bracket-slot.stale::after {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 9px;
+  color: var(--bg);
+  background: var(--gold);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 /* ============ POLYMARKET ODDS ROW ============ */
 
 .pm-odds-row {
