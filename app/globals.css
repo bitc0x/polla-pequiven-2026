@@ -802,6 +802,10 @@ input[type="number"]::-webkit-inner-spin-button {
   box-shadow: var(--shadow-card);
 }
 
+@media (max-width: 480px) {
+  .group-card { padding: 14px; }
+}
+
 .group-card::before {
   content: '';
   position: absolute;
@@ -1550,10 +1554,16 @@ button.team-pick:active:not(:disabled):not(.unresolved) {
 }
 
 @media (max-width: 720px) {
-  .bracket-tree-v2 { min-width: 880px; }
-  .team-pick { font-size: 10px; height: 26px; padding: 4px 6px; }
-  .team-pick-flag { font-size: 13px; }
-  .team-pick-placeholder { font-size: 9px; }
+  .bracket-tree-v2 { min-width: 880px; gap: 10px; }
+  .team-pick { font-size: 11px; height: 32px; padding: 6px 8px; }
+  .team-pick-flag { font-size: 14px; }
+  .team-pick-placeholder { font-size: 9.5px; }
+  .bracket-round-title { font-size: 10px; letter-spacing: 0.15em; }
+}
+
+@media (max-width: 480px) {
+  .bracket-tree-v2 { min-width: 820px; gap: 8px; }
+  .team-pick { height: 30px; }
 }
 
 /* ============ STANDINGS PREVIEW ============ */
@@ -1613,6 +1623,11 @@ button.team-pick:active:not(:disabled):not(.unresolved) {
   gap: 10px;
   padding: 16px;
   padding-top: 4px;
+}
+
+@media (max-width: 480px) {
+  .standings-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px; }
+  .standings-preview summary { padding: 12px 14px; font-size: 10px; }
 }
 
 .standings-group {
