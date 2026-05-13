@@ -989,6 +989,25 @@ export default function PollaApp() {
   const autoLocked = now >= TOURNAMENT_START.getTime();
   const locked = config.locked || autoLocked;
 
+  // Auto-sync results from openfootball every 3 minutes when polla is locked
+  // (i.e. tournament running). Skips when tab is hidden. Failure is silent.
+  // Vercel Hobby doesn't allow sub-daily cron, so we poll from the client
+  // instead. As long as anyone has the app open, data stays fresh.
+  useEffect(() => {
+    if (!user || !locked) return;
+    let cancelled = false;
+    async function trySync() {
+      if (cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        await fetch('/api/sync-results', { method: 'GET', cache: 'no-store' });
+      } catch {}
+    }
+    trySync();
+    const i = setInterval(trySync, 3 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(i); };
+  }, [user, locked]);
+
   const showSave = useCallback((kind = 'saved') => {
     setSaveStatus('saving');
     setTimeout(() => setSaveStatus(kind), 200);
