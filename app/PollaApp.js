@@ -75,7 +75,7 @@ function useCountdown(target) {
 }
 
 // ============ POWERED BY POLYMARKET + TRUSTED BY ============
-const TRUSTED_BY = ['Google', 'Netflix', 'BP', 'LATAM Airlines', 'Kurius', 'Bubbles', 'AvoKind', 'Alpaca Roofing', 'Fat Veggies'];
+const TRUSTED_BY = ['Google', 'Netflix', 'BP', 'LATAM Airlines', 'Grupo Altex', 'Ferrero', 'Farmatodo', 'Kurius', 'Bubbles', 'AvoKind', 'Alpaca Roofing', 'Fat Veggies'];
 
 function PoweredByPolymarket() {
   return (
