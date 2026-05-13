@@ -37,7 +37,15 @@ const dbRemove = (sub) => remove(dbPath(sub)).catch((err) => {
   throw err;
 });
 
-const slug = (s) => String(s).toLowerCase()
+// Slug a player's name into a stable ID for Firebase paths.
+// Strips diacritics (José/Jose → "jose"), lowercases, collapses
+// non-alphanumeric runs into single dashes. Critical for case- and
+// accent-insensitive identity so users don't end up with two separate
+// player entries by typing their name slightly differently.
+const slug = (s) => String(s)
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
   .replace(/[^a-z0-9]+/g, '-')
   .replace(/^-+|-+$/g, '')
   .slice(0, 40);
