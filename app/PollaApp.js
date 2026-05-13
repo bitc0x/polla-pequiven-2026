@@ -6,10 +6,10 @@ import { ref, set, onValue, remove } from 'firebase/database';
 import { db, DB_ROOT } from '@/lib/firebase';
 import {
   TEAMS, GROUPS, GROUP_MATCHES, GROUP_DATES,
-  KO_ROUNDS, SPECIAL_AWARDS, SCORING, TOURNAMENT_START,
+  KO_ROUNDS, SPECIAL_AWARDS, TOURNAMENT_START,
   BUY_IN_USD, VENMO_HANDLE, PRIZE_SPLIT, PRIZE_LABELS,
 } from '@/lib/worldcup-data';
-import { scorePlayer, scoreMatchPrediction, computeGroupStandings, buildBracket } from '@/lib/scoring';
+import { scorePlayer, scoreMatchPrediction, buildBracket } from '@/lib/scoring';
 import Avatar from '@/components/Avatar';
 import ThemeToggle from '@/components/ThemeToggle';
 import MusicToggle from '@/components/MusicToggle';

@@ -980,6 +980,20 @@ input[type="number"]::-webkit-inner-spin-button {
   margin-bottom: 24px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-bright) transparent;
+}
+
+.bracket-wrap::-webkit-scrollbar { height: 6px; }
+.bracket-wrap::-webkit-scrollbar-track { background: transparent; }
+.bracket-wrap::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 3px;
+}
+.bracket-wrap::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+@media (max-width: 720px) {
+  .bracket-wrap { padding: 12px; }
 }
 
 .bracket-empty-state {
@@ -1464,15 +1478,21 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 11px;
   font-weight: 600;
   color: var(--text);
-  cursor: pointer;
   transition: all 0.12s;
   text-align: left;
   width: 100%;
 }
 
-.team-pick:hover:not(:disabled):not(.unresolved) {
+button.team-pick { cursor: pointer; }
+div.team-pick { cursor: default; }
+
+button.team-pick:hover:not(:disabled):not(.unresolved) {
   border-color: var(--border-bright);
   background: var(--bg-elevated);
+}
+
+button.team-pick:active:not(:disabled):not(.unresolved) {
+  transform: scale(0.97);
 }
 
 .team-pick.selected {
@@ -1490,7 +1510,7 @@ input[type="number"]::-webkit-inner-spin-button {
   background: transparent;
   border-style: dashed;
   cursor: not-allowed;
-  opacity: 0.65;
+  opacity: 0.55;
 }
 
 .team-pick:disabled {
