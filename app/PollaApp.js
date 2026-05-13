@@ -52,6 +52,37 @@ function useCountdown(target) {
   return { days, hours, mins, secs, locked };
 }
 
+// ============ POWERED BY POLYMARKET + TRUSTED BY ============
+const TRUSTED_BY = ['Google', 'Netflix', 'BP', 'LATAM Airlines', 'Kurius', 'Bubbles', 'AvoKind', 'Alpaca Roofing', 'Fat Veggies'];
+
+function PoweredByPolymarket() {
+  return (
+    <a
+      href="https://polymarket.com/sports/fifa-world-cup/games"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="powered-by"
+      title="Polymarket odds powering this polla"
+    >
+      <span className="powered-by-label">Powered by</span>
+      <img src="/polymarket-logo.png" alt="Polymarket" className="powered-by-logo" />
+    </a>
+  );
+}
+
+function TrustedBy() {
+  return (
+    <div className="trusted-by">
+      <div className="trusted-by-label">TRUSTED BY</div>
+      <div className="trusted-by-list">
+        {TRUSTED_BY.map((name) => (
+          <span key={name} className="trusted-by-item">{name}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ============ LOGIN SCREEN ============
 function LoginScreen({ onLogin }) {
   const [name, setName] = useState('');
@@ -121,10 +152,12 @@ function LoginScreen({ onLogin }) {
         </form>
 
         <div className="login-foot">
-          <span>Pequiven · Petroquímica</span>
+          <PoweredByPolymarket />
           <span className="mono">v2.0</span>
         </div>
       </div>
+
+      <TrustedBy />
     </div>
   );
 }
@@ -235,11 +268,48 @@ function PrizePool({ players }) {
 }
 
 // ============ GROUP STAGE ============
-function GroupStageScreen({ predictions, results, locked, onUpdate, showResults }) {
+function GroupStageScreen({ predictions, results, locked, onUpdate, showResults, pmOdds }) {
   function update(matchId, field, value) {
     if (locked) return;
     const clean = value === '' ? null : Math.max(0, Math.min(20, parseInt(value) || 0));
     onUpdate(matchId, field, clean);
+  }
+
+  function MatchOdds({ matchId }) {
+    const odds = pmOdds?.matches?.[matchId];
+    if (!odds) return null;
+    const home = odds.home != null ? Math.round(odds.home * 100) : null;
+    const draw = odds.draw != null ? Math.round(odds.draw * 100) : null;
+    const away = odds.away != null ? Math.round(odds.away * 100) : null;
+    const totalKnown = [home, draw, away].filter(v => v != null).length;
+    if (totalKnown === 0) return null;
+
+    // Determine which side is favored for visual emphasis
+    const allVals = [home ?? -1, draw ?? -1, away ?? -1];
+    const max = Math.max(...allVals);
+    const favIdx = allVals.indexOf(max);
+
+    return (
+      <div className="pm-odds-row" style={{ gridColumn: '1 / -1' }}>
+        <a href={odds.url} target="_blank" rel="noopener noreferrer" className="pm-odds-link" title="Abrir en Polymarket para tradear">
+          <div className="pm-odds-bars">
+            <div className={`pm-odds-cell ${favIdx === 0 ? 'fav' : ''}`} style={{ flex: home ?? 33 }}>
+              <span className="pm-odds-label">1</span>
+              <span className="pm-odds-pct">{home != null ? `${home}%` : '·'}</span>
+            </div>
+            <div className={`pm-odds-cell middle ${favIdx === 1 ? 'fav' : ''}`} style={{ flex: draw ?? 33 }}>
+              <span className="pm-odds-label">X</span>
+              <span className="pm-odds-pct">{draw != null ? `${draw}%` : '·'}</span>
+            </div>
+            <div className={`pm-odds-cell ${favIdx === 2 ? 'fav' : ''}`} style={{ flex: away ?? 33 }}>
+              <span className="pm-odds-label">2</span>
+              <span className="pm-odds-pct">{away != null ? `${away}%` : '·'}</span>
+            </div>
+          </div>
+          <span className="pm-odds-source">via Polymarket</span>
+        </a>
+      </div>
+    );
   }
 
   return (
@@ -250,6 +320,8 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults 
         {locked
           ? 'Predicciones cerradas. Solo lectura.'
           : 'Predice el marcador exacto de cada partido. Acierto exacto = 5 pts. Solo ganador = 2 pts. Diferencia de goles correcta = +1 pt bonus.'}
+        {' '}
+        Las probabilidades 1X2 vienen de Polymarket en vivo. Click para tradear.
       </p>
 
       <div className="groups-grid">
@@ -295,6 +367,7 @@ function GroupStageScreen({ predictions, results, locked, onUpdate, showResults 
                           <span className="team-name">{TEAMS[match.away].name}</span>
                           <span className="team-flag">{TEAMS[match.away].flag}</span>
                         </div>
+                        <MatchOdds matchId={match.id} />
                         {showResults && real && (
                           <div className={`match-result-tag ${pts > 0 ? 'correct' : 'incorrect'}`}>
                             Real: {real.home} - {real.away}
@@ -1152,6 +1225,7 @@ export default function PollaApp() {
   const [results, setResults] = useState({});
   const [config, setConfig] = useState({ locked: false });
   const [syncMeta, setSyncMeta] = useState(null);
+  const [pmOdds, setPmOdds] = useState(null);
 
   const [saveStatus, setSaveStatus] = useState(null);
 
@@ -1213,6 +1287,23 @@ export default function PollaApp() {
     const i = setInterval(trySync, 3 * 60 * 1000);
     return () => { cancelled = true; clearInterval(i); };
   }, [user, locked]);
+
+  // Polymarket odds polling: every 90s when user is on the app
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    async function loadOdds() {
+      if (cancelled) return;
+      try {
+        const r = await fetch('/api/polymarket-odds', { cache: 'no-store' });
+        const d = await r.json();
+        if (!cancelled) setPmOdds(d);
+      } catch {}
+    }
+    loadOdds();
+    const i = setInterval(loadOdds, 90 * 1000);
+    return () => { cancelled = true; clearInterval(i); };
+  }, [user]);
 
   const showSave = useCallback((kind = 'saved') => {
     setSaveStatus('saving');
@@ -1374,7 +1465,7 @@ export default function PollaApp() {
           </div>
         </div>
 
-        <div style={{ paddingBottom: 80 }}>
+        <div style={{ paddingBottom: 40 }}>
           {tab === 'grupos' && (
             <GroupStageScreen
               predictions={user.isAdmin ? {} : myPreds}
@@ -1382,6 +1473,7 @@ export default function PollaApp() {
               locked={user.isAdmin || locked}
               onUpdate={updateGroupMatch}
               showResults={showResults}
+              pmOdds={pmOdds}
             />
           )}
           {tab === 'llaves' && (
@@ -1450,6 +1542,11 @@ export default function PollaApp() {
             />
           )}
         </div>
+
+        <footer className="app-footer">
+          <PoweredByPolymarket />
+          <TrustedBy />
+        </footer>
       </div>
 
       {saveStatus && (

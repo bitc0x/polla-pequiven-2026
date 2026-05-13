@@ -1099,6 +1099,177 @@ input[type="number"]::-webkit-inner-spin-button {
   border-color: rgba(205, 127, 50, 0.3);
 }
 
+/* ============ POLYMARKET ODDS ROW ============ */
+
+.pm-odds-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.pm-odds-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 6px;
+  transition: opacity 0.15s;
+}
+
+.pm-odds-link:hover {
+  opacity: 0.85;
+}
+
+.pm-odds-bars {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  height: 26px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.pm-odds-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--bg-card);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: all 0.15s;
+  color: var(--text-muted);
+}
+
+.pm-odds-cell .pm-odds-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.pm-odds-cell .pm-odds-pct {
+  font-weight: 800;
+}
+
+.pm-odds-cell.middle {
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.pm-odds-cell.fav {
+  background: linear-gradient(180deg, rgba(29, 79, 214, 0.18), rgba(29, 79, 214, 0.08));
+  color: var(--text);
+}
+
+.pm-odds-cell.fav .pm-odds-pct {
+  color: #4a7eff;
+}
+
+.pm-odds-source {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .pm-odds-source { display: none; }
+  .pm-odds-cell { font-size: 10px; padding: 0 4px; }
+}
+
+/* ============ POWERED BY POLYMARKET ============ */
+
+.powered-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.15s;
+}
+
+.powered-by:hover {
+  opacity: 0.7;
+}
+
+.powered-by-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.powered-by-logo {
+  height: 18px;
+  width: auto;
+  display: block;
+}
+
+/* ============ TRUSTED BY ============ */
+
+.trusted-by {
+  text-align: center;
+  margin-top: 32px;
+  padding: 20px 16px;
+  max-width: 720px;
+  width: 100%;
+}
+
+.trusted-by-label {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--text-dim);
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.trusted-by-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 14px 22px;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.trusted-by-item {
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.trusted-by-item:hover {
+  opacity: 1;
+}
+
+/* ============ APP FOOTER ============ */
+
+.app-footer {
+  margin: 48px 0 32px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
 /* ============ LEADERBOARD ============ */
 
 .leaderboard {
