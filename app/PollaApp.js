@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { ref, set, onValue, remove } from 'firebase/database';
 import { db, DB_ROOT } from '@/lib/firebase';
