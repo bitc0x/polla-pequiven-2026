@@ -28,6 +28,14 @@ const slug = (s) => String(s).toLowerCase()
   .replace(/^-+|-+$/g, '')
   .slice(0, 40);
 
+// Payment status: 'unpaid' | 'pending' | 'verified'
+// Backward compat with old paid:bool field
+function getPaymentStatus(player) {
+  if (!player) return 'unpaid';
+  if (player.paymentStatus) return player.paymentStatus;
+  return player.paid ? 'verified' : 'unpaid';
+}
+
 // ============ HELPERS ============
 function useCountdown(target) {
   const [now, setNow] = useState(() => Date.now());
@@ -158,9 +166,11 @@ function CountdownBox({ locked }) {
 
 // ============ PRIZE POOL ============
 function PrizePool({ players }) {
-  const paidPlayers = Object.values(players || {}).filter(p => p.paid).length;
-  const totalPlayers = Object.values(players || {}).length;
-  const pool = paidPlayers * BUY_IN_USD;
+  const allPlayers = Object.values(players || {});
+  const verifiedCount = allPlayers.filter(p => getPaymentStatus(p) === 'verified').length;
+  const pendingCount = allPlayers.filter(p => getPaymentStatus(p) === 'pending').length;
+  const totalPlayers = allPlayers.length;
+  const pool = verifiedCount * BUY_IN_USD;
   const potential = totalPlayers * BUY_IN_USD;
   const venmoUrl = `https://venmo.com/${VENMO_HANDLE}?txn=pay&amount=${BUY_IN_USD}&note=Polla%20Pequiven%20Mundial%202026`;
 
@@ -172,8 +182,13 @@ function PrizePool({ players }) {
           <span className="currency">$</span>{pool}
         </div>
         <div className="pool-meta">
-          <strong>{paidPlayers}</strong> de <strong>{totalPlayers}</strong> jugadores pagaron · Buy-in <strong>${BUY_IN_USD}</strong>
-          {totalPlayers > paidPlayers && (
+          <strong>{verifiedCount}</strong> de <strong>{totalPlayers}</strong> verificados · Buy-in <strong>${BUY_IN_USD}</strong>
+          {pendingCount > 0 && (
+            <div className="mt-2 text-xs" style={{ color: 'var(--gold)' }}>
+              {pendingCount} pago{pendingCount === 1 ? '' : 's'} en revisión
+            </div>
+          )}
+          {totalPlayers > verifiedCount + pendingCount && (
             <div className="mt-2 text-dim text-xs">
               Potencial completo: ${potential}
             </div>
@@ -446,19 +461,21 @@ function SpecialsScreen({ predictions, results, locked, onUpdateSpecial, onUpdat
 
 // ============ LEADERBOARD ============
 function LeaderboardScreen({ players, predictions, results, currentName, locked, onPickClick }) {
-  const ranked = useMemo(() => {
-    return Object.entries(players || {}).map(([id, p]) => {
+  const { ranked, pending, unpaid } = useMemo(() => {
+    const all = Object.entries(players || {}).map(([id, p]) => {
       const playerPreds = predictions?.[id] || {};
       const score = scorePlayer(playerPreds, results);
       return {
         id,
         name: p.name,
-        paid: !!p.paid,
+        status: getPaymentStatus(p),
         joinedAt: p.joinedAt,
         score,
         tiebreaker: parseInt(playerPreds?.tiebreaker?.totalGoals),
       };
-    }).sort((a, b) => {
+    });
+
+    const verified = all.filter(p => p.status === 'verified').sort((a, b) => {
       if (b.score.total !== a.score.total) return b.score.total - a.score.total;
       const realTotal = parseInt(results?.tiebreaker?.totalGoals);
       if (!isNaN(realTotal)) {
@@ -468,9 +485,15 @@ function LeaderboardScreen({ players, predictions, results, currentName, locked,
       }
       return a.name.localeCompare(b.name);
     });
+
+    return {
+      ranked: verified,
+      pending: all.filter(p => p.status === 'pending').sort((a, b) => a.joinedAt - b.joinedAt),
+      unpaid: all.filter(p => p.status === 'unpaid').sort((a, b) => a.joinedAt - b.joinedAt),
+    };
   }, [players, predictions, results]);
 
-  if (ranked.length === 0) {
+  if (Object.keys(players || {}).length === 0) {
     return (
       <div>
         <PrizePool players={players} />
@@ -485,56 +508,101 @@ function LeaderboardScreen({ players, predictions, results, currentName, locked,
       <PrizePool players={players} />
       <h2 className="section-title">Tabla de Posiciones</h2>
       <p className="section-sub">
-        Puntos en tiempo real. Se actualizan a medida que entran resultados.
+        Solo jugadores con buy-in verificado aparecen aquí. Los puntos se actualizan en tiempo real.
         {locked && ' Click en cualquier jugador para ver sus predicciones.'}
       </p>
 
-      <div className="leaderboard">
-        <div className="lb-row header">
-          <div>POS</div>
-          <div></div>
-          <div>JUGADOR</div>
-          <div style={{ textAlign: 'right' }}>PTS</div>
-          <div style={{ textAlign: 'right', minWidth: 120 }}>DESGLOSE</div>
+      {ranked.length > 0 ? (
+        <div className="leaderboard">
+          <div className="lb-row header">
+            <div>POS</div>
+            <div></div>
+            <div>JUGADOR</div>
+            <div style={{ textAlign: 'right' }}>PTS</div>
+            <div style={{ textAlign: 'right', minWidth: 120 }}>DESGLOSE</div>
+          </div>
+          {ranked.map((p, idx) => {
+            const isYou = p.name === currentName;
+            const canClick = locked && onPickClick;
+            return (
+              <div
+                key={p.id}
+                className={`lb-row ${canClick ? 'lb-clickable' : ''}`}
+                onClick={canClick ? () => onPickClick(p.id) : undefined}
+              >
+                <div className="lb-rank">{idx + 1}</div>
+                <Avatar name={p.name} size={36} />
+                <div className="lb-name">
+                  {p.name}
+                  {isYou && <span className="you">TÚ</span>}
+                </div>
+                <div className="lb-points">{p.score.total}</div>
+                <div className="lb-breakdown">
+                  G:{p.score.group} K:{p.score.knockout} E:{p.score.specials}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        {ranked.map((p, idx) => {
-          const isYou = p.name === currentName;
-          const canClick = locked && onPickClick;
-          return (
-            <div
-              key={p.id}
-              className={`lb-row ${canClick ? 'lb-clickable' : ''}`}
-              onClick={canClick ? () => onPickClick(p.id) : undefined}
-            >
-              <div className="lb-rank">{idx + 1}</div>
-              <Avatar name={p.name} size={36} />
-              <div className="lb-name">
-                {p.name}
-                {isYou && <span className="you">TÚ</span>}
-                <span className={`lb-paid ${p.paid ? 'yes' : 'no'}`}>
-                  {p.paid ? 'PAGADO' : 'DEBE'}
-                </span>
-              </div>
-              <div className="lb-points">{p.score.total}</div>
-              <div className="lb-breakdown">
-                G:{p.score.group} K:{p.score.knockout} E:{p.score.specials}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      ) : (
+        <div className="empty">
+          Nadie ha sido verificado todavía. Cuando el admin apruebe los buy-ins, los jugadores aparecen aquí.
+        </div>
+      )}
+
+      {(pending.length > 0 || unpaid.length > 0) && (
+        <div className="mt-8">
+          <h3 className="hairline" style={{ fontSize: 12, marginBottom: 12 }}>SALA DE ESPERA</h3>
+          <div className="leaderboard">
+            {pending.map((p) => {
+              const isYou = p.name === currentName;
+              return (
+                <div key={p.id} className="lb-row" style={{ opacity: 0.85 }}>
+                  <div></div>
+                  <Avatar name={p.name} size={32} />
+                  <div className="lb-name">
+                    {p.name}
+                    {isYou && <span className="you">TÚ</span>}
+                    <span className="lb-paid" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--gold)', border: '1px solid rgba(212,175,55,0.3)' }}>
+                      PAGO EN REVISIÓN
+                    </span>
+                  </div>
+                  <div></div>
+                  <div></div>
+                </div>
+              );
+            })}
+            {unpaid.map((p) => {
+              const isYou = p.name === currentName;
+              return (
+                <div key={p.id} className="lb-row" style={{ opacity: 0.6 }}>
+                  <div></div>
+                  <Avatar name={p.name} size={32} />
+                  <div className="lb-name">
+                    {p.name}
+                    {isYou && <span className="you">TÚ</span>}
+                    <span className="lb-paid no">SIN PAGAR</span>
+                  </div>
+                  <div></div>
+                  <div></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ============ MY PICKS ============
-function MyPicksScreen({ playerId, predictions, results, locked, currentName, players }) {
+function MyPicksScreen({ playerId, predictions, results, locked, currentName, players, onMarkPaid }) {
   const myPreds = predictions?.[playerId] || {};
   const score = scorePlayer(myPreds, results);
   const filled = Object.values(myPreds?.groupMatches || {}).filter(m => m && m.home != null && m.away != null).length;
   const totalKO = ['r32','r16','qf','sf','final'].reduce((acc, k) => acc + (myPreds?.knockouts?.[k]?.filter(Boolean).length || 0), 0);
   const totalSp = SPECIAL_AWARDS.filter(a => myPreds?.specials?.[a.id]).length;
-  const isPaid = !!players?.[playerId]?.paid;
+  const myStatus = getPaymentStatus(players?.[playerId]);
   const venmoUrl = `https://venmo.com/${VENMO_HANDLE}?txn=pay&amount=${BUY_IN_USD}&note=Polla%20Pequiven%20Mundial%202026%20-%20${encodeURIComponent(currentName)}`;
 
   return (
@@ -564,19 +632,47 @@ function MyPicksScreen({ playerId, predictions, results, locked, currentName, pl
         </div>
       </div>
 
-      {!isPaid && (
-        <a href={venmoUrl} target="_blank" rel="noopener noreferrer" className="venmo-card" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, marginBottom: 24 }}>
-          <div>
+      {myStatus === 'unpaid' && (
+        <div className="venmo-card mb-6" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ flex: '1 1 220px' }}>
             <div className="venmo-label">FALTA TU BUY-IN</div>
             <div className="venmo-handle mt-2" style={{ fontSize: 18 }}>
               Paga ${BUY_IN_USD} a <span className="at">@</span>{VENMO_HANDLE}
             </div>
+            <div className="text-xs mt-2" style={{ opacity: 0.85 }}>
+              Sin verificación no apareces en la Tabla oficial ni compites por el premio.
+            </div>
           </div>
-          <div className="venmo-cta">
-            <Icon name="venmo" size={14} />
-            Pagar ahora
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <a href={venmoUrl} target="_blank" rel="noopener noreferrer" className="venmo-cta">
+              <Icon name="venmo" size={14} />
+              Pagar en Venmo
+            </a>
+            <button
+              onClick={onMarkPaid}
+              className="venmo-cta"
+              style={{ background: 'white', color: '#006BD8', cursor: 'pointer' }}
+              title="Marca tu pago como pendiente de aprobación del admin"
+            >
+              <Icon name="check" size={14} />
+              Ya pagué
+            </button>
           </div>
-        </a>
+        </div>
+      )}
+
+      {myStatus === 'pending' && (
+        <div className="warn-msg mb-6" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <strong>Tu pago está en revisión.</strong> El admin lo va a verificar y aparecerás en la Tabla oficial.
+          </div>
+        </div>
+      )}
+
+      {myStatus === 'verified' && (
+        <div className="success-msg mb-6">
+          <strong>Buy-in verificado.</strong> Estás dentro. Suerte.
+        </div>
       )}
 
       {!locked ? (
@@ -585,7 +681,7 @@ function MyPicksScreen({ playerId, predictions, results, locked, currentName, pl
         </div>
       ) : (
         <div className="success-msg">
-          La polla está cerrada. Tus predicciones quedaron en piedra. ¡Suerte!
+          La polla está cerrada. Tus predicciones quedaron en piedra.
         </div>
       )}
     </div>
@@ -674,7 +770,7 @@ function PublicPicksScreen({ players, predictions, results, focusPlayerId, onCle
 function AdminScreen({
   players, predictions, results, config, syncMeta,
   onLockToggle, onSetResult, onSetKOResult, onSetSpecialResult,
-  onSetTiebreaker, onResetAll, onTogglePaid, onSyncNow
+  onSetTiebreaker, onResetAll, onSetPaymentStatus, onSyncNow
 }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -714,7 +810,13 @@ function AdminScreen({
   }
 
   const playerCount = Object.keys(players || {}).length;
-  const paidCount = Object.values(players || {}).filter(p => p.paid).length;
+  const playersWithStatus = Object.entries(players || {}).map(([id, p]) => ({
+    id, ...p, status: getPaymentStatus(p),
+  }));
+  const pendingList = playersWithStatus.filter(p => p.status === 'pending').sort((a, b) => (a.pendingSince || a.joinedAt || 0) - (b.pendingSince || b.joinedAt || 0));
+  const verifiedList = playersWithStatus.filter(p => p.status === 'verified').sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const unpaidList = playersWithStatus.filter(p => p.status === 'unpaid').sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+  const verifiedCount = verifiedList.length;
   const lockedNow = config?.locked;
 
   return (
@@ -723,7 +825,7 @@ function AdminScreen({
         <div>
           <div className="lbl">PANEL DE ADMIN</div>
           <div className="text-xs" style={{ opacity: 0.9, marginTop: 4 }}>
-            {playerCount} jugadores · {paidCount} pagaron · Polla {lockedNow ? 'CERRADA' : 'ABIERTA'}
+            {playerCount} registrados · {verifiedCount} verificados · {pendingList.length} pendientes · Polla {lockedNow ? 'CERRADA' : 'ABIERTA'}
           </div>
         </div>
         <div className="admin-toolbar" style={{ margin: 0 }}>
@@ -750,44 +852,116 @@ function AdminScreen({
         </div>
       )}
 
-      <h2 className="section-title" style={{ fontSize: 22, marginTop: 32 }}>Jugadores · Buy-in tracker</h2>
+      <h2 className="section-title" style={{ fontSize: 22, marginTop: 32 }}>Pendientes de aprobación</h2>
       <p className="section-sub">
-        Marca como pagado cuando recibas el Venmo de cada jugador.
+        Jugadores que clickearon "Ya pagué" y esperan tu verificación.
+        Cruza con Venmo de <strong>@{VENMO_HANDLE}</strong> y aprueba o rechaza.
       </p>
 
-      <div className="leaderboard mb-8">
-        <div className="lb-row header">
-          <div></div>
-          <div></div>
-          <div>JUGADOR</div>
-          <div></div>
-          <div style={{ textAlign: 'right' }}>BUY-IN</div>
-        </div>
-        {Object.entries(players || {}).map(([id, p]) => (
-          <div key={id} className="lb-row">
-            <div></div>
-            <Avatar name={p.name} size={32} />
-            <div className="lb-name">{p.name}</div>
-            <div></div>
-            <div style={{ textAlign: 'right' }}>
-              <button
-                className={p.paid ? 'btn-ok' : 'btn-warn'}
-                onClick={() => onTogglePaid(id, !p.paid)}
-                style={{ padding: '6px 12px', fontSize: 11 }}
-              >
-                {p.paid ? `✓ PAGÓ $${BUY_IN_USD}` : `Marcar pagado`}
-              </button>
+      {pendingList.length === 0 ? (
+        <div className="sync-meta" style={{ marginBottom: 32 }}>Sin pendientes ahora mismo.</div>
+      ) : (
+        <div className="leaderboard mb-8">
+          {pendingList.map((p) => (
+            <div key={p.id} className="lb-row">
+              <div></div>
+              <Avatar name={p.name} size={32} />
+              <div className="lb-name">
+                {p.name}
+                <span className="lb-paid" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--gold)', border: '1px solid rgba(212,175,55,0.3)' }}>
+                  ESPERANDO
+                </span>
+              </div>
+              <div></div>
+              <div style={{ textAlign: 'right', display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  className="btn-ok"
+                  onClick={() => onSetPaymentStatus(p.id, 'verified')}
+                  style={{ padding: '6px 12px', fontSize: 11 }}
+                >
+                  Aprobar
+                </button>
+                <button
+                  className="btn-danger"
+                  onClick={() => onSetPaymentStatus(p.id, 'unpaid')}
+                  style={{ padding: '6px 12px', fontSize: 11 }}
+                >
+                  Rechazar
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-        {Object.keys(players || {}).length === 0 && (
-          <div className="empty" style={{ padding: 40 }}>Nadie se ha registrado todavía.</div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+
+      <h2 className="section-title" style={{ fontSize: 22 }}>Verificados ({verifiedCount})</h2>
+      <p className="section-sub">
+        Premio acumulado: <strong>${verifiedCount * BUY_IN_USD}</strong>. Estos jugadores aparecen en la Tabla oficial.
+      </p>
+
+      {verifiedList.length === 0 ? (
+        <div className="sync-meta" style={{ marginBottom: 32 }}>Aún no hay jugadores verificados.</div>
+      ) : (
+        <div className="leaderboard mb-8">
+          {verifiedList.map((p) => (
+            <div key={p.id} className="lb-row">
+              <div></div>
+              <Avatar name={p.name} size={32} />
+              <div className="lb-name">
+                {p.name}
+                <span className="lb-paid yes">PAGÓ ${BUY_IN_USD}</span>
+              </div>
+              <div></div>
+              <div style={{ textAlign: 'right' }}>
+                <button
+                  className="btn-ghost"
+                  onClick={() => onSetPaymentStatus(p.id, 'unpaid')}
+                  style={{ padding: '5px 10px', fontSize: 10 }}
+                  title="Revertir el estado del pago"
+                >
+                  Revertir
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h2 className="section-title" style={{ fontSize: 22 }}>Sin pagar ({unpaidList.length})</h2>
+      <p className="section-sub">
+        Jugadores que se registraron pero no han clickeado "Ya pagué". Puedes marcarlos directo si llegan por otro canal.
+      </p>
+
+      {unpaidList.length === 0 ? (
+        <div className="sync-meta" style={{ marginBottom: 32 }}>Sin pendientes en esta categoría.</div>
+      ) : (
+        <div className="leaderboard mb-8">
+          {unpaidList.map((p) => (
+            <div key={p.id} className="lb-row" style={{ opacity: 0.7 }}>
+              <div></div>
+              <Avatar name={p.name} size={32} />
+              <div className="lb-name">
+                {p.name}
+                <span className="lb-paid no">SIN PAGAR</span>
+              </div>
+              <div></div>
+              <div style={{ textAlign: 'right' }}>
+                <button
+                  className="btn-ok"
+                  onClick={() => onSetPaymentStatus(p.id, 'verified')}
+                  style={{ padding: '6px 12px', fontSize: 11 }}
+                >
+                  Marcar verificado
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h2 className="section-title" style={{ fontSize: 22 }}>Resultados reales — Fase de grupos</h2>
       <p className="section-sub">
-        Los resultados se sincronizan automáticamente cada 15 minutos vía openfootball/worldcup.json. Puedes editar a mano si necesitas.
+        Los resultados se sincronizan automáticamente cada 3 minutos vía openfootball/worldcup.json. Puedes editar a mano si necesitas.
       </p>
 
       <div className="groups-grid">
@@ -980,7 +1154,7 @@ export default function PollaApp() {
       dbSet(`players/${playerId}`, {
         name: user.name,
         joinedAt: Date.now(),
-        paid: false,
+        paymentStatus: 'unpaid',
       });
     }
   }, [user, playerId, players]);
@@ -1067,9 +1241,27 @@ export default function PollaApp() {
     dbRemove('config');
     dbRemove('syncMeta');
   }
-  function togglePaid(pid, val) {
+  function setPaymentStatus(pid, newStatus) {
     showSave();
-    dbSet(`players/${pid}/paid`, !!val);
+    const update = { paymentStatus: newStatus };
+    if (newStatus === 'pending') update.pendingSince = Date.now();
+    if (newStatus === 'verified') update.verifiedAt = Date.now();
+    // Patch the player's payment fields without wiping name/joinedAt
+    Object.entries(update).forEach(([k, v]) => {
+      dbSet(`players/${pid}/${k}`, v);
+    });
+    // Also clear old `paid` boolean if it's there (cleanup)
+    if (newStatus !== 'verified') {
+      dbSet(`players/${pid}/paid`, null);
+    } else {
+      dbSet(`players/${pid}/paid`, true); // keep for backward read compat
+    }
+  }
+
+  // Player self-marks as pending after paying via Venmo
+  function markSelfPaid() {
+    if (!playerId) return;
+    setPaymentStatus(playerId, 'pending');
   }
 
   function handlePickClick(pid) {
@@ -1206,6 +1398,7 @@ export default function PollaApp() {
               locked={locked}
               currentName={user.name}
               players={players}
+              onMarkPaid={markSelfPaid}
             />
           )}
           {tab === 'admin' && user.isAdmin && (
@@ -1221,7 +1414,7 @@ export default function PollaApp() {
               onSetSpecialResult={setSpecialResult}
               onSetTiebreaker={setTiebreakerResult}
               onResetAll={resetAll}
-              onTogglePaid={togglePaid}
+              onSetPaymentStatus={setPaymentStatus}
             />
           )}
         </div>
