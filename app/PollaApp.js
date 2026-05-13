@@ -1249,8 +1249,6 @@ export default function PollaApp() {
   const [syncMeta, setSyncMeta] = useState(null);
   const [pmOdds, setPmOdds] = useState(null);
 
-  const [saveStatus, setSaveStatus] = useState(null);
-
   useEffect(() => {
     setHydrated(true);
     try {
@@ -1327,12 +1325,6 @@ export default function PollaApp() {
     return () => { cancelled = true; clearInterval(i); };
   }, [user]);
 
-  const showSave = useCallback((kind = 'saved') => {
-    setSaveStatus('saving');
-    setTimeout(() => setSaveStatus(kind), 200);
-    setTimeout(() => setSaveStatus(null), 2400);
-  }, []);
-
   function handleLogin(u) {
     setUser(u);
     try { localStorage.setItem('polla-user', JSON.stringify(u)); } catch {}
@@ -1343,70 +1335,108 @@ export default function PollaApp() {
     setTab('grupos');
   }
 
+  // Optimistic update helper: writes to local state INSTANTLY so the UI
+  // reflects the change without waiting for Firebase round-trip. Firebase
+  // listener will eventually fire with the same value (no-op) confirming
+  // persistence. If the write fails, the listener will eventually correct.
+  function updatePredictionField(path, value) {
+    setPredictions(prev => {
+      const next = JSON.parse(JSON.stringify(prev || {}));
+      const parts = path.split('.');
+      let cur = next;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const p = parts[i];
+        if (!cur[p] || typeof cur[p] !== 'object') cur[p] = {};
+        cur = cur[p];
+      }
+      cur[parts[parts.length - 1]] = value;
+      return next;
+    });
+  }
+  function updateResultField(path, value) {
+    setResults(prev => {
+      const next = JSON.parse(JSON.stringify(prev || {}));
+      const parts = path.split('.');
+      let cur = next;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const p = parts[i];
+        if (!cur[p] || typeof cur[p] !== 'object') cur[p] = {};
+        cur = cur[p];
+      }
+      cur[parts[parts.length - 1]] = value;
+      return next;
+    });
+  }
+
   function updateGroupMatch(matchId, field, value) {
     if (!playerId || locked) return;
+    // Optimistic local update so the input reflects the value instantly
+    updatePredictionField(`${playerId}.groupMatches.${matchId}.${field}`, value);
     const current = predictions?.[playerId]?.groupMatches?.[matchId] || {};
-    showSave();
     dbSet(`predictions/${playerId}/groupMatches/${matchId}`, { ...current, [field]: value });
   }
   function updateKO(roundKey, teams) {
     if (!playerId || locked) return;
-    showSave();
+    updatePredictionField(`${playerId}.knockouts.${roundKey}`, teams);
     dbSet(`predictions/${playerId}/knockouts/${roundKey}`, teams);
   }
   function updateSpecial(awardId, value) {
     if (!playerId || locked) return;
-    showSave();
+    updatePredictionField(`${playerId}.specials.${awardId}`, value);
     dbSet(`predictions/${playerId}/specials/${awardId}`, value);
   }
   function updateTiebreaker(field, value) {
     if (!playerId || locked) return;
-    showSave();
     const clean = value === '' ? null : Math.max(0, parseInt(value) || 0);
+    updatePredictionField(`${playerId}.tiebreaker.${field}`, clean);
     dbSet(`predictions/${playerId}/tiebreaker/${field}`, clean);
   }
 
-  function setMatchResult(matchId, val) { showSave(); dbSet(`results/groupMatches/${matchId}`, val); }
-  function setKOResult(roundKey, teams) { showSave(); dbSet(`results/knockouts/${roundKey}`, teams); }
-  function setSpecialResult(awardId, value) { showSave(); dbSet(`results/specials/${awardId}`, value); }
+  function setMatchResult(matchId, val) {
+    updateResultField(`groupMatches.${matchId}`, val);
+    dbSet(`results/groupMatches/${matchId}`, val);
+  }
+  function setKOResult(roundKey, teams) {
+    updateResultField(`knockouts.${roundKey}`, teams);
+    dbSet(`results/knockouts/${roundKey}`, teams);
+  }
+  function setSpecialResult(awardId, value) {
+    updateResultField(`specials.${awardId}`, value);
+    dbSet(`results/specials/${awardId}`, value);
+  }
   function setTiebreakerResult(field, value) {
-    showSave();
     const clean = value === '' ? null : Math.max(0, parseInt(value) || 0);
+    updateResultField(`tiebreaker.${field}`, clean);
     dbSet(`results/tiebreaker/${field}`, clean);
   }
+
+  function setPaymentStatus(pid, newStatus) {
+    const update = { paymentStatus: newStatus };
+    if (newStatus === 'pending') update.pendingSince = Date.now();
+    if (newStatus === 'verified') update.verifiedAt = Date.now();
+    Object.entries(update).forEach(([k, v]) => {
+      dbSet(`players/${pid}/${k}`, v);
+    });
+    if (newStatus !== 'verified') {
+      dbSet(`players/${pid}/paid`, null);
+    } else {
+      dbSet(`players/${pid}/paid`, true);
+    }
+  }
+
+  function markSelfPaid() {
+    if (!playerId) return;
+    setPaymentStatus(playerId, 'pending');
+  }
   function toggleLock() {
-    showSave();
     dbSet('config', { ...config, locked: !config.locked });
   }
   function resetAll() {
-    showSave();
     dbRemove('players');
     dbRemove('predictions');
     dbRemove('results');
     dbRemove('config');
     dbRemove('syncMeta');
-  }
-  function setPaymentStatus(pid, newStatus) {
-    showSave();
-    const update = { paymentStatus: newStatus };
-    if (newStatus === 'pending') update.pendingSince = Date.now();
-    if (newStatus === 'verified') update.verifiedAt = Date.now();
-    // Patch the player's payment fields without wiping name/joinedAt
-    Object.entries(update).forEach(([k, v]) => {
-      dbSet(`players/${pid}/${k}`, v);
-    });
-    // Also clear old `paid` boolean if it's there (cleanup)
-    if (newStatus !== 'verified') {
-      dbSet(`players/${pid}/paid`, null);
-    } else {
-      dbSet(`players/${pid}/paid`, true); // keep for backward read compat
-    }
-  }
-
-  // Player self-marks as pending after paying via Venmo
-  function markSelfPaid() {
-    if (!playerId) return;
-    setPaymentStatus(playerId, 'pending');
   }
 
   function handlePickClick(pid) {
@@ -1417,7 +1447,13 @@ export default function PollaApp() {
   if (!hydrated) return <div className="loading-page"><div className="spinner" /></div>;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
 
+  // Predictions and results come straight from state. The update functions
+  // write OPTIMISTICALLY to state (so the UI reflects the typed value
+  // instantly), then persist to Firebase in the background. Firebase's
+  // onValue listener confirms with the same value (no-op).
   const myPreds = playerId ? (predictions?.[playerId] || {}) : {};
+  const mergedResults = results;
+
   const showResults = locked;
 
   return (
@@ -1551,7 +1587,7 @@ export default function PollaApp() {
             <AdminScreen
               players={players}
               predictions={predictions}
-              results={results}
+              results={mergedResults}
               config={config}
               syncMeta={syncMeta}
               onLockToggle={toggleLock}
@@ -1570,13 +1606,6 @@ export default function PollaApp() {
           <TrustedBy />
         </footer>
       </div>
-
-      {saveStatus && (
-        <div className={`save-status ${saveStatus}`}>
-          {saveStatus === 'saving' && <><span className="spinner" style={{ width: 12, height: 12 }} /> Guardando...</>}
-          {saveStatus === 'saved' && <><Icon name="check" size={14} /> Guardado</>}
-        </div>
-      )}
     </>
   );
 }
