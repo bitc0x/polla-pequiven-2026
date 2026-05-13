@@ -723,14 +723,34 @@ function LeaderboardScreen({ players, predictions, results, currentName, locked,
 }
 
 // ============ MY PICKS ============
-function MyPicksScreen({ playerId, predictions, results, locked, currentName, players, onMarkPaid }) {
+function MyPicksScreen({ playerId, predictions, results, locked, currentName, players, onMarkPaid, onSubmit, onUnsubmit }) {
   const myPreds = predictions?.[playerId] || {};
   const score = scorePlayer(myPreds, results);
   const filled = Object.values(myPreds?.groupMatches || {}).filter(m => m && m.home != null && m.away != null).length;
   const totalKO = ['r32','r16','qf','sf','final'].reduce((acc, k) => acc + (myPreds?.knockouts?.[k]?.filter(Boolean).length || 0), 0);
   const totalSp = SPECIAL_AWARDS.filter(a => myPreds?.specials?.[a.id]).length;
-  const myStatus = getPaymentStatus(players?.[playerId]);
+  const myPlayer = players?.[playerId];
+  const myStatus = getPaymentStatus(myPlayer);
+  const submittedAt = myPlayer?.submittedAt || null;
+  const isSubmitted = !!submittedAt;
   const venmoUrl = `https://venmo.com/${VENMO_HANDLE}?txn=pay&amount=${BUY_IN_USD}&note=Polla%20Pequiven%20Mundial%202026%20-%20${encodeURIComponent(currentName)}`;
+
+  // Completion metrics for the submit gate
+  const totalKOSlots = ['r32','r16','qf','sf','final'].reduce((acc, k) => acc + (KO_ROUNDS.find(r => r.key === k)?.count || 0), 0);
+  const totalGroupMatches = 72;
+  const totalSpecialAwards = SPECIAL_AWARDS.length;
+  const allFilled = filled === totalGroupMatches && totalKO === totalKOSlots && totalSp === totalSpecialAwards;
+  const completionPct = Math.round(((filled / totalGroupMatches) + (totalKO / totalKOSlots) + (totalSp / totalSpecialAwards)) / 3 * 100);
+
+  function handleSubmit() {
+    const msg = allFilled
+      ? '¿Confirmas que quieres enviar tus predicciones como definitivas? Podrás revertir hasta el 11 de junio.'
+      : `Tienes ${completionPct}% completado. Aún te faltan picks. ¿Quieres enviar igual? Los espacios vacíos contarán como 0 pts. Podrás revertir hasta el 11 de junio.`;
+    if (window.confirm(msg)) onSubmit();
+  }
+  function handleUnsubmit() {
+    if (window.confirm('¿Revertir tus predicciones para volver a editar? Cuando termines, recuerda enviarlas otra vez.')) onUnsubmit();
+  }
 
   return (
     <div>
@@ -744,17 +764,17 @@ function MyPicksScreen({ playerId, predictions, results, locked, currentName, pl
         </div>
         <div className="stat-tile">
           <div className="lbl">FASE DE GRUPOS</div>
-          <div className="val">{filled}/72</div>
+          <div className="val">{filled}/{totalGroupMatches}</div>
           <div className="text-xs text-muted mt-2 mono">{score.group} pts</div>
         </div>
         <div className="stat-tile">
           <div className="lbl">LLAVES</div>
-          <div className="val">{totalKO}/62</div>
+          <div className="val">{totalKO}/{totalKOSlots}</div>
           <div className="text-xs text-muted mt-2 mono">{score.knockout} pts</div>
         </div>
         <div className="stat-tile">
           <div className="lbl">ESPECIALES</div>
-          <div className="val">{totalSp}/{SPECIAL_AWARDS.length}</div>
+          <div className="val">{totalSp}/{totalSpecialAwards}</div>
           <div className="text-xs text-muted mt-2 mono">{score.specials} pts</div>
         </div>
       </div>
@@ -796,21 +816,65 @@ function MyPicksScreen({ playerId, predictions, results, locked, currentName, pl
         </div>
       )}
 
-      {myStatus === 'verified' && (
+      {myStatus === 'verified' && !isSubmitted && (
         <div className="success-msg mb-6">
-          <strong>Buy-in verificado.</strong> Estás dentro. Suerte.
+          <strong>Buy-in verificado.</strong> Estás dentro.
         </div>
       )}
 
-      {!locked ? (
-        <div className="warn-msg">
-          Puedes editar tus predicciones hasta el 11 de junio. Ve a Grupos, Llaves o Especiales.
+      {/* ===== SUBMIT GATE ===== */}
+      <div className="submit-card">
+        <div className="submit-card-head">
+          <div>
+            <div className="hairline">ESTADO DE TUS PREDICCIONES</div>
+            <div className="submit-status-line">
+              {locked
+                ? <><span className="dot dot-red" /> Polla cerrada, todo en piedra.</>
+                : isSubmitted
+                  ? <><span className="dot dot-green" /> Enviadas {new Date(submittedAt).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</>
+                  : <><span className="dot dot-gold" /> En edición ({completionPct}% completo)</>}
+            </div>
+          </div>
+          {!locked && (
+            <div className="submit-actions">
+              {isSubmitted ? (
+                <button className="btn-ghost" onClick={handleUnsubmit} title="Volver a editar">
+                  <Icon name="undo" size={13} /> Revertir
+                </button>
+              ) : (
+                <button
+                  className={`btn-primary ${allFilled ? '' : 'btn-soft'}`}
+                  onClick={handleSubmit}
+                  title={allFilled ? 'Confirmar y enviar tus predicciones definitivas' : 'Aún te faltan picks pero puedes enviar de todas formas'}
+                >
+                  <Icon name="check" size={14} />
+                  Enviar predicciones definitivas
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="success-msg">
-          La polla está cerrada. Tus predicciones quedaron en piedra.
-        </div>
-      )}
+
+        {!locked && (
+          <>
+            <div className="submit-progress">
+              <div className="submit-progress-bar" style={{ width: `${completionPct}%` }} />
+            </div>
+            <div className="submit-detail">
+              <span>Grupos <strong>{filled}/{totalGroupMatches}</strong></span>
+              <span>Llaves <strong>{totalKO}/{totalKOSlots}</strong></span>
+              <span>Especiales <strong>{totalSp}/{totalSpecialAwards}</strong></span>
+            </div>
+            <p className="submit-help">
+              {isSubmitted
+                ? 'Tus predicciones están bloqueadas para edición. Puedes revertir y volver a editar hasta el 11 de junio. Después de esa fecha quedan en piedra.'
+                : allFilled
+                  ? 'Tienes todo completo. Cuando estés listo, envía tus predicciones definitivas. Podrás revertir hasta el 11 de junio.'
+                  : 'Auto-guardado activo en cada cambio. Cuando estés listo, envía tus predicciones definitivas. Puedes revertir hasta el 11 de junio.'}
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -1428,6 +1492,26 @@ export default function PollaApp() {
     if (!playerId) return;
     setPaymentStatus(playerId, 'pending');
   }
+
+  function submitPicks() {
+    if (!playerId || locked) return;
+    const ts = Date.now();
+    // Optimistic local
+    setPlayers(prev => ({
+      ...prev,
+      [playerId]: { ...(prev[playerId] || {}), submittedAt: ts },
+    }));
+    dbSet(`players/${playerId}/submittedAt`, ts);
+  }
+  function unsubmitPicks() {
+    if (!playerId || locked) return;
+    setPlayers(prev => {
+      const p = { ...(prev[playerId] || {}) };
+      delete p.submittedAt;
+      return { ...prev, [playerId]: p };
+    });
+    dbSet(`players/${playerId}/submittedAt`, null);
+  }
   function toggleLock() {
     dbSet('config', { ...config, locked: !config.locked });
   }
@@ -1453,6 +1537,10 @@ export default function PollaApp() {
   // onValue listener confirms with the same value (no-op).
   const myPreds = playerId ? (predictions?.[playerId] || {}) : {};
   const mergedResults = results;
+  // Soft lock: when a player has submitted their picks, inputs are disabled
+  // for them until they revert. Hard lock (deadline passed) overrides.
+  const submittedByMe = !!players?.[playerId]?.submittedAt;
+  const editLocked = user.isAdmin || locked || submittedByMe;
 
   const showResults = locked;
 
@@ -1524,11 +1612,21 @@ export default function PollaApp() {
         </div>
 
         <div style={{ paddingBottom: 40 }}>
+          {!user.isAdmin && submittedByMe && !locked && ['grupos', 'llaves', 'especiales'].includes(tab) && (
+            <div className="submitted-banner">
+              <div>
+                <strong>Predicciones enviadas.</strong> Para editar, ve a <em>Mis Picks</em> y presiona <em>Revertir</em>. Disponible hasta el 11 de junio.
+              </div>
+              <button className="btn-ghost" onClick={() => setTab('mis-picks')}>
+                Ir a Mis Picks
+              </button>
+            </div>
+          )}
           {tab === 'grupos' && (
             <GroupStageScreen
               predictions={user.isAdmin ? {} : myPreds}
               results={results}
-              locked={user.isAdmin || locked}
+              locked={editLocked}
               onUpdate={updateGroupMatch}
               showResults={showResults}
               pmOdds={pmOdds}
@@ -1538,7 +1636,7 @@ export default function PollaApp() {
             <KnockoutScreen
               predictions={user.isAdmin ? {} : myPreds}
               results={results}
-              locked={user.isAdmin || locked}
+              locked={editLocked}
               onUpdateKO={updateKO}
               showResults={showResults}
             />
@@ -1547,7 +1645,7 @@ export default function PollaApp() {
             <SpecialsScreen
               predictions={user.isAdmin ? {} : myPreds}
               results={results}
-              locked={user.isAdmin || locked}
+              locked={editLocked}
               onUpdateSpecial={updateSpecial}
               onUpdateTiebreaker={updateTiebreaker}
               showResults={showResults}
@@ -1581,6 +1679,8 @@ export default function PollaApp() {
               currentName={user.name}
               players={players}
               onMarkPaid={markSelfPaid}
+              onSubmit={submitPicks}
+              onUnsubmit={unsubmitPicks}
             />
           )}
           {tab === 'admin' && user.isAdmin && (

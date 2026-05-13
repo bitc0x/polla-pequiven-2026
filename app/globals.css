@@ -1212,6 +1212,156 @@ button.bracket-slot {
   border-color: rgba(205, 127, 50, 0.3);
 }
 
+/* ============ SUBMIT CARD + BANNER ============ */
+
+.submit-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.submit-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at top right, rgba(212, 175, 55, 0.06), transparent 60%);
+}
+
+.submit-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  position: relative;
+}
+
+.submit-status-line {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 20px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  letter-spacing: 0.01em;
+}
+
+.submit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-green { background: var(--green); box-shadow: 0 0 12px rgba(52, 199, 89, 0.4); }
+.dot-gold  { background: var(--gold);  box-shadow: 0 0 10px rgba(212, 175, 55, 0.4); }
+.dot-red   { background: var(--pequiven-red-bright); box-shadow: 0 0 10px rgba(200, 16, 46, 0.4); }
+
+.submit-progress {
+  height: 6px;
+  background: var(--bg);
+  border-radius: 100px;
+  margin-top: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.submit-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--pequiven-red), var(--gold));
+  border-radius: 100px;
+  transition: width 0.3s ease-out;
+}
+
+.submit-detail {
+  display: flex;
+  gap: 18px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  flex-wrap: wrap;
+}
+.submit-detail strong {
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.submit-help {
+  margin-top: 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  border-top: 1px dashed var(--border);
+  padding-top: 14px;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--pequiven-red);
+  color: white;
+  border: 1px solid var(--pequiven-red);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-primary:hover {
+  background: var(--pequiven-red-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(200, 16, 46, 0.3);
+}
+
+.btn-primary.btn-soft {
+  background: transparent;
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.btn-primary.btn-soft:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 6px 16px rgba(212, 175, 55, 0.18);
+}
+
+.submitted-banner {
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.12), rgba(52, 199, 89, 0.04));
+  border: 1px solid rgba(52, 199, 89, 0.35);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--green);
+}
+
+.submitted-banner em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--text);
+}
+
 /* ============ POLYMARKET ODDS ROW ============ */
 
 .pm-odds-row {

@@ -87,6 +87,13 @@ export function Icon({ name, size = 16 }) {
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       );
+    case 'undo':
+      return (
+        <svg {...props} aria-hidden="true">
+          <path d="M9 14L4 9l5-5" />
+          <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H10" />
+        </svg>
+      );
     default:
       return null;
   }
