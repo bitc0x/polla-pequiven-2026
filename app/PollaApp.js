@@ -7,7 +7,7 @@ import { db, DB_ROOT } from '@/lib/firebase';
 import {
   TEAMS, GROUPS, GROUP_MATCHES, GROUP_DATES,
   KO_ROUNDS, SPECIAL_AWARDS, SCORING, TOURNAMENT_START,
-  BUY_IN_USD, VENMO_HANDLE,
+  BUY_IN_USD, VENMO_HANDLE, PRIZE_SPLIT, PRIZE_LABELS,
 } from '@/lib/worldcup-data';
 import { scorePlayer, scoreMatchPrediction } from '@/lib/scoring';
 import Avatar from '@/components/Avatar';
@@ -173,41 +173,64 @@ function PrizePool({ players }) {
   const pool = verifiedCount * BUY_IN_USD;
   const potential = totalPlayers * BUY_IN_USD;
   const venmoUrl = `https://venmo.com/${VENMO_HANDLE}?txn=pay&amount=${BUY_IN_USD}&note=Polla%20Pequiven%20Mundial%202026`;
+  const splits = PRIZE_SPLIT.map(pct => Math.floor(pool * pct));
 
   return (
-    <div className="pool-grid">
-      <div className="pool-card">
-        <div className="hairline mb-2">PREMIO ACUMULADO</div>
-        <div className="pool-amount">
-          <span className="currency">$</span>{pool}
-        </div>
-        <div className="pool-meta">
-          <strong>{verifiedCount}</strong> de <strong>{totalPlayers}</strong> verificados · Buy-in <strong>${BUY_IN_USD}</strong>
-          {pendingCount > 0 && (
-            <div className="mt-2 text-xs" style={{ color: 'var(--gold)' }}>
-              {pendingCount} pago{pendingCount === 1 ? '' : 's'} en revisión
-            </div>
-          )}
-          {totalPlayers > verifiedCount + pendingCount && (
-            <div className="mt-2 text-dim text-xs">
-              Potencial completo: ${potential}
-            </div>
-          )}
-        </div>
-      </div>
-      <a href={venmoUrl} target="_blank" rel="noopener noreferrer" className="venmo-card">
-        <div>
-          <div className="venmo-label">Paga tu buy-in</div>
-          <div className="venmo-handle mt-2">
-            <span className="at">@</span>{VENMO_HANDLE}
+    <>
+      <div className="pool-grid">
+        <div className="pool-card">
+          <div className="hairline mb-2">PREMIO ACUMULADO</div>
+          <div className="pool-amount">
+            <span className="currency">$</span>{pool}
+          </div>
+          <div className="pool-meta">
+            <strong>{verifiedCount}</strong> de <strong>{totalPlayers}</strong> verificados · Buy-in <strong>${BUY_IN_USD}</strong>
+            {pendingCount > 0 && (
+              <div className="mt-2 text-xs" style={{ color: 'var(--gold)' }}>
+                {pendingCount} pago{pendingCount === 1 ? '' : 's'} en revisión
+              </div>
+            )}
+            {totalPlayers > verifiedCount + pendingCount && (
+              <div className="mt-2 text-dim text-xs">
+                Potencial completo: ${potential}
+              </div>
+            )}
           </div>
         </div>
-        <div className="venmo-cta">
-          <Icon name="venmo" size={14} />
-          Pagar ${BUY_IN_USD} en Venmo
+        <a href={venmoUrl} target="_blank" rel="noopener noreferrer" className="venmo-card">
+          <div>
+            <div className="venmo-label">Paga tu buy-in</div>
+            <div className="venmo-handle mt-2">
+              <span className="at">@</span>{VENMO_HANDLE}
+            </div>
+          </div>
+          <div className="venmo-cta">
+            <Icon name="venmo" size={14} />
+            Pagar ${BUY_IN_USD} en Venmo
+          </div>
+        </a>
+      </div>
+
+      <div className="prize-breakdown">
+        <div className="hairline mb-4">REPARTICIÓN DEL POTE · 60/30/10</div>
+        <div className="prize-bars">
+          {PRIZE_SPLIT.map((pct, i) => (
+            <div key={i} className={`prize-bar place-${i + 1}`}>
+              <div className="prize-bar-medal">
+                {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+              </div>
+              <div className="prize-bar-content">
+                <div className="prize-bar-label">{PRIZE_LABELS[i]}</div>
+                <div className="prize-bar-amount">
+                  <span className="currency">$</span>{splits[i]}
+                </div>
+                <div className="prize-bar-pct">{Math.round(pct * 100)}% del pote</div>
+              </div>
+            </div>
+          ))}
         </div>
-      </a>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -524,17 +547,26 @@ function LeaderboardScreen({ players, predictions, results, currentName, locked,
           {ranked.map((p, idx) => {
             const isYou = p.name === currentName;
             const canClick = locked && onPickClick;
+            const placeIdx = idx < 3 ? idx : -1; // 0, 1, 2 or -1
+            const prizeAmount = placeIdx >= 0
+              ? Math.floor(ranked.length === 0 ? 0 : (Object.values(players || {}).filter(pl => getPaymentStatus(pl) === 'verified').length * BUY_IN_USD) * PRIZE_SPLIT[placeIdx])
+              : 0;
             return (
               <div
                 key={p.id}
-                className={`lb-row ${canClick ? 'lb-clickable' : ''}`}
+                className={`lb-row ${canClick ? 'lb-clickable' : ''} ${placeIdx >= 0 ? `place-${placeIdx + 1}` : ''}`}
                 onClick={canClick ? () => onPickClick(p.id) : undefined}
               >
-                <div className="lb-rank">{idx + 1}</div>
+                <div className="lb-rank">
+                  {placeIdx === 0 ? '🥇' : placeIdx === 1 ? '🥈' : placeIdx === 2 ? '🥉' : (idx + 1)}
+                </div>
                 <Avatar name={p.name} size={36} />
                 <div className="lb-name">
                   {p.name}
                   {isYou && <span className="you">TÚ</span>}
+                  {placeIdx >= 0 && prizeAmount > 0 && (
+                    <span className="lb-prize">${prizeAmount}</span>
+                  )}
                 </div>
                 <div className="lb-points">{p.score.total}</div>
                 <div className="lb-breakdown">
